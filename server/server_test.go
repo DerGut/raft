@@ -23,12 +23,12 @@ func Test_processRequestVote(t *testing.T) {
 		{
 			"Reply false if term < currentTerm",
 			args{
-				state.NewTestState(0, nil, replog.Log{}, 0),
+				state.NewTestState(1, nil, replog.Log{}, 0),
 				RequestVoteRequest{},
 				make(chan memberState, 1),
 			},
-			state.NewTestState(0, nil, replog.Log{}, 0),
-			&RequestVoteResponse{},
+			state.NewTestState(1, nil, replog.Log{}, 0),
+			&RequestVoteResponse{1, false},
 		},
 	}
 	for _, tt := range tests {
