@@ -128,7 +128,9 @@ func (s *Server) AppendEntries(req AppendEntriesRequest, res *AppendEntriesRespo
 	s.timer = s.electionTimer()
 
 	res.Term = responseTerm(req.Term, s.state.CurrentTerm())
-	ok := s.ensureTerm(req.Term)
+
+	// TODO: Rename ok
+	ok := ensureCurrentTermOrReturnToFollower(s.state, req.Term, s.stateChange)
 	if !ok {
 		res.success = false
 		return nil
@@ -160,52 +162,45 @@ type RequestVoteResponse struct {
 // RequestVote is invoked by candidates to gather votes (§5.2).
 func (s *Server) RequestVote(req RequestVoteRequest, res *RequestVoteResponse) error {
 	log.Printf("%s received RequestVote from %s\n", s, req.CandidateID)
-
-	res.Term = responseTerm(req.Term, s.state.CurrentTerm())
-	ok := s.ensureTerm(req.Term)
-	if !ok {
-		res.VoteGranted = false
-		return nil
-	}
-
-	if s.state.CanVoteFor(req.CandidateID) {
-		if !s.state.Log().IsMoreUpToDateThan(req.LastLogIndex, req.LastLogTerm) {
-			s.voteFor(req.CandidateID, res)
-			return nil
-		}
-	}
-
-	res.VoteGranted = false
+	s.state, res = processRequestVote(s.state, req, s.stateChange)
 	return nil
 }
 
-func processRequestVote(s state.State, req RequestVoteRequest, reset chan bool) (new state.State, res *RequestVoteResponse) {
-	res.Term = responseTerm(req.Term, s.CurrentTerm())
-	requesterIsAhead := ensureCurrentTermOrReturnToFollower(s, req.Term)
-	if !requesterIsAhead {
+func processRequestVote(s state.State, req RequestVoteRequest, stateC chan memberState) (state.State, *RequestVoteResponse) {
+	var res RequestVoteResponse
+	t := req.Term
+	ct := s.CurrentTerm()
+	rt := responseTerm(t, ct)
+	res.Term = rt
+
+	// TODO: Rename ok
+	ok := ensureCurrentTermOrReturnToFollower(s, req.Term, stateC)
+	if !ok {
 		res.VoteGranted = false
-		return s, res
+		return s, &res
 	}
 
 	if s.CanVoteFor(req.CandidateID) {
 		if !s.Log().IsMoreUpToDateThan(req.LastLogIndex, req.LastLogTerm) {
-			voteFor(req.CandidateID, s, res)
-			return s, res
+			resetTimerAndReturnToFollower(stateC)
+			s.SetVotedFor(req.CandidateID)
+			res.VoteGranted = true
+			return s, &res
 		}
 	}
 
 	res.VoteGranted = false
-	return new, res
+	return s, &res
 }
 
-func ensureCurrentTermOrReturnToFollower(s state.State, reqTerm replog.Term) bool {
+func ensureCurrentTermOrReturnToFollower(s state.State, reqTerm replog.Term, stateC chan memberState) bool {
 	if isAhead(s, reqTerm) {
 		return false
 	}
 	if isBehind(s, reqTerm) {
 		log.Println("Entering new term", reqTerm)
 		s.UpdateTerm(reqTerm)
-		s.returnToFollower()
+		resetTimerAndReturnToFollower(stateC)
 	}
 	return true
 }
@@ -229,15 +224,6 @@ func maxTerm(x, y replog.Term) replog.Term {
 	return replog.Term(max)
 }
 
-func (s *Server) returnToFollower(timer *timer.ResettingTimer, stateC chan memberState) {
-	if s.timer != nil {
-		s.timer.Stop()
-	}
-	s.stateChange <- Follower
-}
-
-func voteFor(id string, s state.State, res *RequestVoteResponse) {
-	res.VoteGranted = true
-	s.timer = s.electionTimer()
-	s.SetVotedFor(id)
+func resetTimerAndReturnToFollower(stateC chan memberState) {
+	stateC <- Follower
 }

@@ -53,9 +53,9 @@ func (t *randomElectionTimer) Reset() {
 
 func (t *randomElectionTimer) electionTimeout() time.Duration {
 	if t.debug {
-		return randomElectionTimeout() * 100
+		return RandomElectionTimeout() * 100
 	}
-	return randomElectionTimeout()
+	return RandomElectionTimeout()
 }
 
 // RandomElectionTimeout returns a randomized election timeout between 150 and 300ms

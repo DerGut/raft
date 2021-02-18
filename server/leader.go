@@ -13,8 +13,8 @@ func (s *Server) sendHeartBeat() {
 		select {
 		case res := <-resC:
 			if isBehind(s.state, res.Term) {
-				s.updateTerm(res.Term)
-				s.returnToFollower()
+				s.state.UpdateTerm(res.Term)
+				resetTimerAndReturnToFollower(s.stateChange)
 				return
 			}
 		case <-errC:

@@ -9,7 +9,7 @@ import (
 
 type State interface {
 	CurrentTerm() replog.Term
-	IncrCurrentTerm(id *string)
+	IncrCurrentTerm()
 	UpdateTerm(new replog.Term)
 	VotedFor() *string
 	CanVoteFor(id string) bool
@@ -49,15 +49,18 @@ func NewState() State {
 	}
 }
 
+func NewTestState(term replog.Term, votedFor *string, log replog.Log, commitIndex int) State {
+	return &state{term, votedFor, log, commitIndex}
+}
+
 // CurrentTerm returns the latest term the server has seen
 func (s *state) CurrentTerm() replog.Term {
 	return s.currentTerm
 }
 
 // IncrCurrentTerm increments the current term by one
-func (s *state) IncrCurrentTerm(id *string) {
+func (s *state) IncrCurrentTerm() {
 	s.currentTerm++
-	s.votedFor = id
 }
 
 // UpdateTerm sets current term to the new term and resets votedFor

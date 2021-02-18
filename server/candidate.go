@@ -15,7 +15,7 @@ func (s *Server) startElection() {
 	s.Cluster.callRequestVoteOnAll(&req, resC, errC)
 	votes, err := s.countVotes(resC, errC)
 	if err != nil {
-		s.returnToFollower()
+		resetTimerAndReturnToFollower(s.stateChange)
 		return
 	}
 
@@ -26,8 +26,8 @@ func (s *Server) startElection() {
 }
 
 func (s *Server) initializeNewTerm() {
-	s.state.IncrCurrentTerm(&s.MemberID)
-	s.electionTimer.Reset()
+	s.state.IncrCurrentTerm()
+	s.state.SetVotedFor(s.MemberID)
 }
 
 func (s *Server) buildRequestVoteRequest() RequestVoteRequest {
@@ -45,8 +45,8 @@ func (s *Server) countVotes(resC chan *RequestVoteResponse, errC chan error) (in
 	for i := 0; i < cap(resC); i++ {
 		select {
 		case res := <-resC:
-			if s.isBehind(res.Term) {
-				s.updateTerm(res.Term)
+			if isBehind(s.state, res.Term) {
+				s.state.UpdateTerm(res.Term)
 				return 0, errors.New("Term was behind")
 			}
 			if res.VoteGranted {
