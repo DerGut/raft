@@ -168,10 +168,7 @@ func (s *Server) RequestVote(req RequestVoteRequest, res *RequestVoteResponse) e
 
 func processRequestVote(s state.State, req RequestVoteRequest, stateC chan memberState) (state.State, *RequestVoteResponse) {
 	var res RequestVoteResponse
-	t := req.Term
-	ct := s.CurrentTerm()
-	rt := responseTerm(t, ct)
-	res.Term = rt
+	res.Term = responseTerm(req.Term, s.CurrentTerm())
 
 	// TODO: Rename ok
 	ok := ensureCurrentTermOrReturnToFollower(s, req.Term, stateC)
