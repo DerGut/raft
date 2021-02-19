@@ -25,7 +25,7 @@ func init() {
 	flag.Var(&members, "members", "URIs of the cluster members")
 	flag.Parse()
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	log.SetPrefix(*address)
+	log.SetPrefix(*address + " ")
 }
 
 func main() {
@@ -38,9 +38,7 @@ func main() {
 	l := registerServer(s)
 	go http.Serve(l, nil)
 
-	if err := s.Run(*debug); err != nil {
-		log.Fatal("Failed to run server: ", err)
-	}
+	s.Run(*debug)
 }
 
 func seedRand(address string) error {

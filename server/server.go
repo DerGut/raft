@@ -24,7 +24,7 @@ type Server struct {
 }
 
 func (s *Server) String() string {
-	return fmt.Sprintf("%s[%s][%d]", s.MemberID, s.currentState, s.state.CurrentTerm())
+	return fmt.Sprintf("%s[%d]:", s.currentState, s.state.CurrentTerm())
 }
 
 type memberState int
@@ -46,33 +46,29 @@ func (s memberState) String() string {
 func NewServer(uri string, members []string) *Server {
 	log.Printf("Starting server %s of cluster %s\n", uri, members)
 
-	cluster := NewCluster(members)
-
-	s := Server{
+	return &Server{
 		MemberID:     uri,
-		Cluster:      cluster,
+		Cluster:      NewCluster(members),
 		currentState: Follower,
-		stateChange:  make(chan memberState, 1),
+		stateChange:  make(chan memberState, 100),
 
 		state: state.NewState(),
 	}
-
-	return &s
 }
 
+// TODO: Decouple state setting from timer resetting
+
 // Run makes the server start listening to incoming RPC requests
-func (s *Server) Run(debug bool) error {
+func (s *Server) Run(debug bool) {
 	log.Printf("%s starts as FOLLOWER\n", s)
-	s.stateChange <- Follower
+	s.timer = s.electionTimer()
 
 	for {
 		switch <-s.stateChange {
 		case Follower:
-			s.timer = s.electionTimer()
 			s.setState(Follower)
 			break
 		case Candidate:
-			s.timer = s.electionTimer()
 			s.setState(Candidate)
 			s.startElection()
 			break
@@ -85,21 +81,26 @@ func (s *Server) Run(debug bool) error {
 }
 
 func (s *Server) electionTimer() *time.Timer {
-	return time.AfterFunc(timer.RandomElectionTimeout(), s.electionTimeoutFunc)
+	if s.timer != nil {
+		s.timer.Stop()
+	}
+	t := timer.RandomElectionTimeout()
+	return time.AfterFunc(t, s.electionTimeoutFunc)
 }
 
 func (s *Server) electionTimeoutFunc() {
 	s.stateChange <- Candidate
-	time.AfterFunc(timer.RandomElectionTimeout(), s.electionTimeoutFunc)
+	s.timer = s.electionTimer()
 }
 
 func (s *Server) heartbeatTimer() *time.Timer {
+	s.timer.Stop()
 	return time.AfterFunc(timer.HeartbeatTimeout, s.heartbeatTimeoutFunc)
 }
 
 func (s *Server) heartbeatTimeoutFunc() {
 	s.sendHeartBeat()
-	s.timer = time.AfterFunc(timer.HeartbeatTimeout, s.heartbeatTimeoutFunc)
+	s.timer = s.heartbeatTimer()
 }
 
 func (s *Server) setState(newState memberState) {
@@ -120,32 +121,41 @@ type AppendEntriesRequest struct {
 
 type AppendEntriesResponse struct {
 	replog.Term
-	success bool
+	Success bool
 }
 
 // AppendEntries is invoked by leader to rexplicate log entries (§5.3), It is also used as heartbeat (§5.2).
 func (s *Server) AppendEntries(req AppendEntriesRequest, res *AppendEntriesResponse) error {
 	s.timer = s.electionTimer()
 
-	res.Term = responseTerm(req.Term, s.state.CurrentTerm())
+	s.state, *res = processAppendEntries(s.state, req, s.stateChange)
 
-	// TODO: Rename ok
-	ok := ensureCurrentTermOrReturnToFollower(s.state, req.Term, s.stateChange)
-	if !ok {
-		res.success = false
-		return nil
-	}
-
-	if !s.state.Log().MatchesUntilNow(req.PrevLogIndex, req.PrevLogTerm) {
-		res.success = false
-		return nil
-	}
-
-	s.state.DeleteConflictingAndAddNewEntries(req.PrevLogIndex, req.Entries)
-	s.state.UpdateCommitIndexIfStale(req.LeaderCommit)
-
-	res.success = true
 	return nil
+}
+
+func processAppendEntries(s state.State, req AppendEntriesRequest, stateC chan memberState) (new state.State, res AppendEntriesResponse) {
+	res.Term = responseTerm(req.Term, s.CurrentTerm())
+
+	if isAhead(s, req.Term) {
+		res.Success = false
+		return s, res
+	}
+	if isBehind(s, req.Term) {
+		log.Println("Entering new term", req.Term)
+		s.UpdateTerm(req.Term)
+		returnToFollower(stateC)
+	}
+
+	if !s.Log().MatchesUntilNow(req.PrevLogIndex, req.PrevLogTerm) {
+		res.Success = false
+		return s, res
+	}
+
+	s.DeleteConflictingAndAddNewEntries(req.PrevLogIndex, req.Entries)
+	s.UpdateCommitIndexIfStale(req.LeaderCommit)
+
+	res.Success = true
+	return s, res
 }
 
 type RequestVoteRequest struct {
@@ -161,45 +171,39 @@ type RequestVoteResponse struct {
 
 // RequestVote is invoked by candidates to gather votes (§5.2).
 func (s *Server) RequestVote(req RequestVoteRequest, res *RequestVoteResponse) error {
-	log.Printf("%s received RequestVote from %s\n", s, req.CandidateID)
-	s.state, res = processRequestVote(s.state, req, s.stateChange)
+	s.state, *res = processRequestVote(s.state, req, s.stateChange)
+	if res.VoteGranted {
+		s.timer = s.electionTimer()
+	}
 	return nil
 }
 
-func processRequestVote(s state.State, req RequestVoteRequest, stateC chan memberState) (state.State, *RequestVoteResponse) {
-	var res RequestVoteResponse
+// TODO: See whether timerReset and revertToFollower can really be used together that many times
+
+func processRequestVote(s state.State, req RequestVoteRequest, stateC chan memberState) (new state.State, res RequestVoteResponse) {
 	res.Term = responseTerm(req.Term, s.CurrentTerm())
 
-	// TODO: Rename ok
-	ok := ensureCurrentTermOrReturnToFollower(s, req.Term, stateC)
-	if !ok {
+	if isAhead(s, req.Term) {
 		res.VoteGranted = false
-		return s, &res
+		return s, res
+	}
+	if isBehind(s, req.Term) {
+		log.Println("Entering new term", req.Term)
+		s.UpdateTerm(req.Term)
+		returnToFollower(stateC)
 	}
 
 	if s.CanVoteFor(req.CandidateID) {
 		if !s.Log().IsMoreUpToDateThan(req.LastLogIndex, req.LastLogTerm) {
-			resetTimerAndReturnToFollower(stateC)
+			returnToFollower(stateC)
 			s.SetVotedFor(req.CandidateID)
 			res.VoteGranted = true
-			return s, &res
+			return s, res
 		}
 	}
 
 	res.VoteGranted = false
-	return s, &res
-}
-
-func ensureCurrentTermOrReturnToFollower(s state.State, reqTerm replog.Term, stateC chan memberState) bool {
-	if isAhead(s, reqTerm) {
-		return false
-	}
-	if isBehind(s, reqTerm) {
-		log.Println("Entering new term", reqTerm)
-		s.UpdateTerm(reqTerm)
-		resetTimerAndReturnToFollower(stateC)
-	}
-	return true
+	return s, res
 }
 
 // isAhead compares the currentTerm with the term received by an RPC.
@@ -221,6 +225,6 @@ func maxTerm(x, y replog.Term) replog.Term {
 	return replog.Term(max)
 }
 
-func resetTimerAndReturnToFollower(stateC chan memberState) {
+func returnToFollower(stateC chan memberState) {
 	stateC <- Follower
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/DerGut/kv-store/replog"
@@ -17,7 +16,7 @@ func Test_processRequestVote(t *testing.T) {
 		name            string
 		args            args
 		wantState       state.State
-		wantRes         *RequestVoteResponse
+		wantRes         RequestVoteResponse
 		wantStateChange bool
 	}{
 		{
@@ -27,7 +26,7 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 0},
 			},
 			wantState:       state.NewTestState(1, nil, replog.Log{}, 0),
-			wantRes:         &RequestVoteResponse{Term: 1, VoteGranted: false},
+			wantRes:         RequestVoteResponse{Term: 1, VoteGranted: false},
 			wantStateChange: false,
 		},
 		{
@@ -37,7 +36,7 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 1, CandidateID: "another member"},
 			},
 			wantState:       state.NewTestState(1, stringPtr("some member"), replog.Log{}, 0),
-			wantRes:         &RequestVoteResponse{1, false},
+			wantRes:         RequestVoteResponse{1, false},
 			wantStateChange: false,
 		},
 		{
@@ -47,7 +46,7 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 1, CandidateID: "member", LastLogIndex: 0},
 			},
 			wantState:       state.NewTestState(1, stringPtr("member"), replog.Log{replog.Entry{}}, 0),
-			wantRes:         &RequestVoteResponse{1, false},
+			wantRes:         RequestVoteResponse{1, false},
 			wantStateChange: false,
 		},
 		{
@@ -57,7 +56,7 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 1, CandidateID: "member", LastLogIndex: 1, LastLogTerm: 0},
 			},
 			wantState:       state.NewTestState(1, stringPtr("member"), replog.Log{replog.Entry{Term: 1}}, 0),
-			wantRes:         &RequestVoteResponse{1, false},
+			wantRes:         RequestVoteResponse{1, false},
 			wantStateChange: false,
 		},
 		{
@@ -67,7 +66,7 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 1, CandidateID: "member"},
 			},
 			wantState:       state.NewTestState(1, stringPtr("member"), replog.Log{}, 0),
-			wantRes:         &RequestVoteResponse{1, true},
+			wantRes:         RequestVoteResponse{1, true},
 			wantStateChange: true,
 		},
 		{
@@ -77,29 +76,134 @@ func Test_processRequestVote(t *testing.T) {
 				RequestVoteRequest{Term: 2, CandidateID: "member"},
 			},
 			wantState:       state.NewTestState(2, stringPtr("member"), replog.Log{}, 0),
-			wantRes:         &RequestVoteResponse{2, true},
+			wantRes:         RequestVoteResponse{2, true},
 			wantStateChange: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateC := make(chan memberState, 2) // TODO: RequestVote can order two state changes. Is this bad?
+			stateC := make(chan memberState, 2) // TODO: Look at this
 			gotState, gotRes := processRequestVote(tt.args.s, tt.args.req, stateC)
-			var gotStateChange bool
-			select {
-			case <-stateC:
-				gotStateChange = true
-			default:
-				gotStateChange = false
-			}
+			gotStateChange := hasValue(stateC)
 			if gotStateChange != tt.wantStateChange {
 				t.Errorf("processRequestVote() gotStateChange = %t, want %t", gotStateChange, tt.wantStateChange)
 			}
-			if !reflect.DeepEqual(gotState, tt.wantState) {
+			if !state.Equal(gotState, tt.wantState) {
 				t.Errorf("processRequestVote() gotState = %v, want %v", gotState, tt.wantState)
 			}
-			if !reflect.DeepEqual(gotRes, tt.wantRes) {
+			if gotRes != tt.wantRes {
 				t.Errorf("processRequestVote() gotRes = %v, want %v", gotRes, tt.wantRes)
+			}
+		})
+	}
+}
+
+func Test_processAppendEntries(t *testing.T) {
+	type args struct {
+		s   state.State
+		req AppendEntriesRequest
+	}
+	tests := []struct {
+		name            string
+		args            args
+		wantState       state.State
+		wantRes         AppendEntriesResponse
+		wantStateChange bool
+	}{
+		{
+			"Reply false if requesters term is < receivers term",
+			args{
+				state.NewTestState(1, nil, replog.Log{}, 0),
+				AppendEntriesRequest{
+					Term: 0,
+				},
+			},
+			state.NewTestState(1, nil, replog.Log{}, 0),
+			AppendEntriesResponse{Success: false, Term: 1},
+			false,
+		},
+		{
+			"Convert to Follower if requesters term > receivers term",
+			args{
+				state.NewTestState(1, nil, replog.Log{}, 0),
+				AppendEntriesRequest{
+					Term: 2,
+				},
+			},
+			state.NewTestState(2, nil, replog.Log{}, 0),
+			AppendEntriesResponse{Success: true, Term: 2},
+			true,
+		},
+		{
+			"Reply false if log doesn't contain an entry at prevLogIndex",
+			args{
+				state.NewTestState(1, nil, replog.Log{}, 0),
+				AppendEntriesRequest{
+					Term:         1,
+					PrevLogIndex: 1,
+				},
+			},
+			state.NewTestState(1, nil, replog.Log{}, 0),
+			AppendEntriesResponse{Success: false, Term: 1},
+			false,
+		},
+		{
+			"Reply false if entry at prevLogIndex does not match prevLogTerm",
+			args{
+				state.NewTestState(1, nil, replog.Log{replog.Entry{Term: 0}}, 0),
+				AppendEntriesRequest{
+					Term:         1,
+					PrevLogIndex: 1,
+					PrevLogTerm:  1,
+				},
+			},
+			state.NewTestState(1, nil, replog.Log{replog.Entry{Term: 0}}, 0),
+			AppendEntriesResponse{Success: false, Term: 1},
+			false,
+		},
+		{
+			"Conflicting log entries get deleted and replaced with new ones",
+			args{
+				state.NewTestState(0, nil, replog.Log{replog.Entry{}, replog.Entry{}, replog.Entry{}}, 0),
+				AppendEntriesRequest{
+					PrevLogIndex: 1,
+					Entries:      []replog.Entry{{Term: 1}, {Term: 1}},
+				},
+			},
+			state.NewTestState(0, nil, replog.Log{replog.Entry{}, replog.Entry{Term: 1}, replog.Entry{Term: 1}}, 0),
+			AppendEntriesResponse{Success: true, Term: 0},
+			false,
+		},
+		{
+			"Update commitIndex if leaderCommit is > current commitIndex",
+			args{
+				state.NewTestState(0, nil, replog.Log{}, 0),
+				AppendEntriesRequest{
+					PrevLogIndex: 0,
+					PrevLogTerm:  0,
+					LeaderCommit: 1,
+					Entries:      []replog.Entry{{}},
+				},
+			},
+			state.NewTestState(0, nil, replog.Log{replog.Entry{}}, 1),
+			AppendEntriesResponse{Success: true},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateC := make(chan memberState, 1)
+			gotState, gotRes := processAppendEntries(tt.args.s, tt.args.req, stateC)
+			gotStateChange := hasValue(stateC)
+
+			if gotStateChange != tt.wantStateChange {
+				t.Errorf("processAppendEntries() gotStateChange = %t, want %t", gotStateChange, tt.wantStateChange)
+			}
+			if !state.Equal(gotState, tt.wantState) {
+				t.Errorf("processAppendEntries() gotState = %v, want %v", gotState, tt.wantState)
+			}
+			if gotRes != tt.wantRes {
+				t.Errorf("processAppendEntries() gotRes = %v, want %v", gotRes, tt.wantRes)
 			}
 		})
 	}
@@ -107,4 +211,13 @@ func Test_processRequestVote(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func hasValue(c chan memberState) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
 }

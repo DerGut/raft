@@ -114,7 +114,11 @@ func Equal(x, y State) bool {
 	if x.CurrentTerm() != y.CurrentTerm() {
 		return false
 	}
-	if x.VotedFor() != y.VotedFor() {
+	if x.VotedFor() != nil && y.VotedFor() != nil {
+		if *x.VotedFor() != *y.VotedFor() {
+			return false
+		}
+	} else if x.VotedFor() != y.VotedFor() {
 		return false
 	}
 	if !replog.Equal(x.Log(), y.Log()) {

@@ -14,7 +14,7 @@ func (s *Server) sendHeartBeat() {
 		case res := <-resC:
 			if isBehind(s.state, res.Term) {
 				s.state.UpdateTerm(res.Term)
-				resetTimerAndReturnToFollower(s.stateChange)
+				returnToFollower(s.stateChange)
 				return
 			}
 		case <-errC:

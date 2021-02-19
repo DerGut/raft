@@ -12,10 +12,12 @@ func (s *Server) startElection() {
 	req := s.buildRequestVoteRequest()
 	resC := make(chan *RequestVoteResponse, len(s.Cluster))
 	errC := make(chan error, len(s.Cluster))
+	log.Println(s, "Requesting RequestVote", req)
 	s.Cluster.callRequestVoteOnAll(&req, resC, errC)
 	votes, err := s.countVotes(resC, errC)
 	if err != nil {
-		resetTimerAndReturnToFollower(s.stateChange)
+		log.Println("Discovered new term from votes")
+		returnToFollower(s.stateChange)
 		return
 	}
 
@@ -28,6 +30,7 @@ func (s *Server) startElection() {
 func (s *Server) initializeNewTerm() {
 	s.state.IncrCurrentTerm()
 	s.state.SetVotedFor(s.MemberID)
+	s.timer = s.electionTimer()
 }
 
 func (s *Server) buildRequestVoteRequest() RequestVoteRequest {
@@ -51,9 +54,9 @@ func (s *Server) countVotes(resC chan *RequestVoteResponse, errC chan error) (in
 			}
 			if res.VoteGranted {
 				votesGranted++
-			} else {
 			}
-		case <-errC:
+		case err := <-errC:
+			log.Println("Failed RequestVote", err)
 			continue
 		}
 	}
