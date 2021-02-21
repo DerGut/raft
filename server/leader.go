@@ -1,36 +1,51 @@
 package server
 
-import "github.com/DerGut/kv-store/replog"
+import (
+	"github.com/DerGut/kv-store/replog"
+	"github.com/DerGut/kv-store/state"
+)
 
-func (s *Server) sendHeartBeat() {
-	req := s.buildAppendEntriesRequest([]replog.Entry{})
+func sendHeartBeat(options ClusterOptions, stateC chan state.State, resetC chan memberState) {
+	state := <-stateC
 
-	resC := make(chan *AppendEntriesResponse, len(s.Cluster))
-	errC := make(chan error, len(s.Cluster))
-	s.Cluster.callAppendEntriesOnAll(&req, resC, errC)
+	req := buildAppendEntriesRequest(state, options.Address, []replog.Entry{})
+	cluster := NewCluster(options.Members)
+	state = doSendHeartbeats(state, cluster, req, resetC)
 
-	for i := 0; i < len(s.Cluster); i++ {
+	stateC <- state
+}
+
+func buildAppendEntriesRequest(state state.State, memberID string, entries []replog.Entry) AppendEntriesRequest {
+	l := state.Log()
+	return AppendEntriesRequest{
+		Term:         state.CurrentTerm(),
+		LeaderID:     memberID,
+		PrevLogIndex: l.LastIndex(),
+		PrevLogTerm:  l.LastTerm(),
+		Entries:      entries,
+		LeaderCommit: state.CommitIndex(),
+	}
+}
+
+func doSendHeartbeats(state state.State, cluster Cluster, req AppendEntriesRequest, resetC chan memberState) state.State {
+	clusterSize := len(cluster)
+	resC := make(chan *AppendEntriesResponse, clusterSize)
+	errC := make(chan error, clusterSize)
+
+	cluster.callAppendEntriesOnAll(&req, resC, errC)
+
+	for i := 0; i < clusterSize; i++ {
 		select {
 		case res := <-resC:
-			if isBehind(s.state, res.Term) {
-				s.state.UpdateTerm(res.Term)
-				returnToFollower(s.stateChange)
-				return
+			if isBehind(state, res.Term) {
+				state.UpdateTerm(res.Term)
+				resetC <- Follower
+				return state
 			}
 		case <-errC:
 			continue
 		}
 	}
-}
 
-func (s *Server) buildAppendEntriesRequest(entries []replog.Entry) AppendEntriesRequest {
-	l := s.state.Log()
-	return AppendEntriesRequest{
-		Term:         s.state.CurrentTerm(),
-		LeaderID:     s.MemberID,
-		PrevLogIndex: l.LastIndex(),
-		PrevLogTerm:  l.LastTerm(),
-		Entries:      entries,
-		LeaderCommit: s.state.CommitIndex(),
-	}
+	return state
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"net/rpc"
 )
 
@@ -23,13 +22,11 @@ func (c *client) close() error {
 
 func (c *client) callRequestVote(req *RequestVoteRequest, resC chan *RequestVoteResponse, errC chan error) {
 	res := RequestVoteResponse{}
-	log.Println("Calling RequestVote with", req)
 	err := c.rpcClient.Call("Server.RequestVote", req, &res)
 	if err != nil {
 		errC <- err
 		return
 	}
-	log.Println("Received RequestVote response", res)
 	resC <- &res
 }
 
