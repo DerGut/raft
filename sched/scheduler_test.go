@@ -9,7 +9,7 @@ const waitTimeout = 1 * time.Second
 
 func Test_Scheduler_runsSchedulable(t *testing.T) {
 	sched := testSchedulable{hasRun: make(chan struct{})}
-	Schedule(zeroDuration, &sched, nil)
+	Schedule(shortDuration, &sched, nil)
 
 	repititions := 3
 	for i := 0; i < repititions; i++ {
@@ -25,7 +25,7 @@ func Test_Scheduler_stopsSchedule(t *testing.T) {
 	sched := testSchedulable{hasRun: make(chan struct{})}
 	signal := make(chan Signal, 1)
 	signal <- Stop
-	Schedule(zeroDuration, &sched, signal)
+	Schedule(shortDuration, &sched, signal)
 
 	select {
 	case <-sched.hasRun:
@@ -69,7 +69,7 @@ func Test_Scheduler_pausesAndResumesSchedule(t *testing.T) {
 	sched := testSchedulable{hasRun: make(chan struct{})}
 	signal := make(chan Signal, 1)
 	signal <- Pause
-	Schedule(zeroDuration, &sched, signal)
+	Schedule(shortDuration, &sched, signal)
 
 	select {
 	case <-time.After(waitTimeout):
@@ -90,7 +90,7 @@ func Test_Scheduler_pausesAndStopsSchedule(t *testing.T) {
 	sched := testSchedulable{hasRun: make(chan struct{})}
 	signal := make(chan Signal, 1)
 	signal <- Pause
-	Schedule(zeroDuration, &sched, signal)
+	Schedule(shortDuration, &sched, signal)
 
 	select {
 	case <-time.After(waitTimeout):
@@ -107,7 +107,7 @@ func Test_Scheduler_pausesAndStopsSchedule(t *testing.T) {
 	}
 }
 
-func zeroDuration() time.Duration { return 0 }
+func shortDuration() time.Duration { return 10 * time.Millisecond }
 
 type testSchedulable struct{ hasRun chan struct{} }
 
