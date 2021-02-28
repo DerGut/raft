@@ -26,6 +26,10 @@ func (l Log) DeleteConflictingEntries(prevLogIndex int, entries []Entry) Log {
 	return l
 }
 
+func (l Log) Append(entry Entry) Log {
+	return append(l, entry)
+}
+
 func (l Log) AppendEntries(prevLogIndex int, entries []Entry) Log {
 	if len(entries) == 0 {
 		return l
@@ -76,6 +80,19 @@ func (l Log) LastTerm() Term {
 		return 0
 	}
 	return l[len(l)-1].Term
+}
+
+func (l Log) At(index int) Entry {
+	// Index should be at least 1
+	return l[index-1]
+}
+
+func (l Log) Since(prevIndex int) []Entry {
+	if prevIndex >= l.LastIndex() || prevIndex < 1 {
+		return []Entry{}
+	}
+
+	return l[prevIndex:]
 }
 
 // Equal returns true if x and y equal each other
