@@ -1,14 +1,15 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log"
 
+	"github.com/DerGut/kv-store/raft/state"
 	"github.com/DerGut/kv-store/replog"
-	"github.com/DerGut/kv-store/state"
 )
 
-func startElection(options ClusterOptions, stateC chan state.State, resetC chan memberState) {
+func startElection(ctx context.Context, options ClusterOptions, stateC chan state.State, resetC chan memberState) {
 	log.Println("Trying to start election, waiting for state")
 	state := <-stateC
 	log.Println("Aquired state")
@@ -18,13 +19,14 @@ func startElection(options ClusterOptions, stateC chan state.State, resetC chan 
 
 	log.Println("Starting new election")
 	cluster := NewCluster(options.Members)
-	state = runElection(state, cluster, req, resetC)
+	state = runElection(ctx, state, cluster, req, resetC)
 
 	stateC <- state
 }
 
 func initializeNewTerm(state state.State, memberID string, resetC chan memberState) state.State {
 	state.IncrCurrentTerm()
+	log.Println("Entering term", state.CurrentTerm())
 	state.SetVotedFor(memberID)
 	resetC <- Candidate
 
@@ -41,16 +43,15 @@ func buildRequestVoteRequest(state state.State, memberID string) RequestVoteRequ
 	}
 }
 
-func runElection(state state.State, cluster Cluster, req RequestVoteRequest, resetC chan memberState) state.State {
+func runElection(ctx context.Context, state state.State, cluster Cluster, req RequestVoteRequest, resetC chan memberState) state.State {
 	clusterSize := len(cluster) + 1
 	resC := make(chan *RequestVoteResponse, clusterSize-1)
-	errC := make(chan error, clusterSize-1)
 
 	log.Println("Calling request vote on all")
-	go cluster.callRequestVoteOnAll(&req, resC, errC)
-	state, votes, err := countVotes(state, resC, errC)
+	go cluster.callRequestVoteOnAll(ctx, &req, resC)
+	state, votes, err := countVotes(state, resC)
 	if err != nil {
-		log.Println("Discovered new term from votes")
+		log.Println("Discovered new term from votes, reverting to FOLLOWER")
 		resetC <- Follower
 		return state
 	}
@@ -64,21 +65,19 @@ func runElection(state state.State, cluster Cluster, req RequestVoteRequest, res
 	return state
 }
 
-func countVotes(state state.State, resC chan *RequestVoteResponse, errC chan error) (state.State, int, error) {
+func countVotes(state state.State, resC chan *RequestVoteResponse) (state.State, int, error) {
 	votesGranted := 0
 	for i := 0; i < cap(resC); i++ {
-		select { // TODO: is stuck here for some reason?
-		case res := <-resC:
-			if isBehind(state, res.Term) {
-				state.UpdateTerm(res.Term)
-				return state, 0, errors.New("Term was behind")
-			}
-			if res.VoteGranted {
-				votesGranted++
-			}
-		case err := <-errC:
-			log.Println("Failed RequestVote", err)
+		res := <-resC
+		if res == nil {
 			continue
+		}
+		if isBehind(state, res.Term) {
+			state.UpdateTerm(res.Term)
+			return state, 0, errors.New("Term was behind")
+		}
+		if res.VoteGranted {
+			votesGranted++
 		}
 	}
 

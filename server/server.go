@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"log"
 	"math"
+	"sync"
 	"time"
 
+	"github.com/DerGut/kv-store/raft/state"
 	"github.com/DerGut/kv-store/replog"
-	"github.com/DerGut/kv-store/state"
 	"github.com/DerGut/kv-store/timer"
 )
 
@@ -27,6 +29,9 @@ const (
 type Server struct {
 	options ClusterOptions
 
+	membership     memberState
+	membershipLock sync.Locker
+
 	timeout chan timeout
 	timer   *time.Timer
 	reset   chan memberState
@@ -43,10 +48,11 @@ func (s memberState) String() string {
 
 func NewServer(options ClusterOptions) *Server {
 	return &Server{
-		options: options,
-		timeout: make(chan timeout, 100),
-		reset:   make(chan memberState, 100),
-		state:   make(chan state.State),
+		options:    options,
+		membership: Follower,
+		timeout:    make(chan timeout, 100),
+		reset:      make(chan memberState, 100),
+		state:      make(chan state.State),
 	}
 }
 
@@ -54,28 +60,44 @@ func NewServer(options ClusterOptions) *Server {
 func (s *Server) Run(debug bool) {
 	log.Printf("Starting server %s of cluster %s\n", s.options.Address, s.options.Members)
 	log.Println("Starts as FOLLOWER")
+
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+	ctx, cancel = context.WithCancel(context.Background())
 	s.timer = s.electionTimer()
+
 	go func() {
 		s.state <- state.NewState()
 	}()
+
 	for {
 		select {
 		case t := <-s.timeout:
-			switch t {
-			case election:
+			log.Println("cancelling context because", t)
+			cancel()
+			ctx, cancel = context.WithCancel(context.Background())
+			m := s.Membership()
+			switch m {
+			case Candidate:
 				log.Println("Is now CANDIDATE")
-				go startElection(s.options, s.state, s.reset)
-			case heartbeat:
+				go startElection(ctx, s.options, s.state, s.reset)
+			case Leader:
+				log.Println("Heartbeat")
 				go sendHeartBeat(s.options, s.state, s.reset)
 			}
 		case r := <-s.reset:
-			switch r {
-			case Follower:
-				log.Println("Is now FOLLOWER")
-				fallthrough
-			case Candidate:
+			m := s.Membership()
+			if m == Follower || m == Leader {
+				log.Println("cancelling context because", r)
+				cancel()
+				ctx, cancel = context.WithCancel(context.Background())
+			}
+			if m == Follower || m == Candidate {
 				s.timer = s.electionTimer()
-			case Leader:
+			}
+			if m == Leader {
 				s.timer = s.heartbeatTimer()
 			}
 		}
@@ -99,6 +121,18 @@ func (s *Server) heartbeatTimer() *time.Timer {
 		s.reset <- Leader
 		s.timeout <- heartbeat
 	})
+}
+
+func (s *Server) Membership() memberState {
+	s.membershipLock.Lock()
+	defer s.membershipLock.Unlock()
+	return s.membership
+}
+
+func (s *Server) setMembership(m memberState) {
+	s.membershipLock.Lock()
+	s.membership = m
+	s.membershipLock.Unlock()
 }
 
 type AppendEntriesRequest struct {
@@ -164,7 +198,9 @@ type RequestVoteResponse struct {
 
 // RequestVote is invoked by candidates to gather votes (§5.2).
 func (s *Server) RequestVote(req RequestVoteRequest, res *RequestVoteResponse) error {
-	state := <-s.state
+	var state state.State
+
+	state = <-s.state
 	state, *res = processRequestVote(state, req, s.reset)
 	s.state <- state
 

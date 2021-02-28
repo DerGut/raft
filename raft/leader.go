@@ -17,7 +17,7 @@ func doHeartbeat(ctx context.Context, s state.State, options server.ClusterOptio
 func (r *Raft) applyCommand(ctx context.Context, req rpc.ClientRequestRequest) rpc.ClientRequestResponse {
 	log.Println("Applying command", req)
 	r.State.AppendToLog(req.Cmd)
-	if ok := updateFollowers(ctx, r.State.(LeaderState), r.ClusterOptions); ok {
+	if ok := updateFollowers(ctx, r.State.(state.LeaderState), r.ClusterOptions); ok {
 		return rpc.ClientRequestResponse{Success: true}
 	}
 	return rpc.ClientRequestResponse{Success: false}

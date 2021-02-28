@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/rpc"
 	"strings"
+	"time"
 
 	"github.com/DerGut/kv-store/server"
 )
@@ -34,8 +35,9 @@ func main() {
 		log.Fatal("Failed to seed rand with server address: ", err)
 	}
 
-	s := server.NewServer(*address, members)
-	l := registerServer(s)
+	o := server.ClusterOptions{Address: *address, Members: members}
+	s := server.NewServer(o)
+	l := registerServer(s, o)
 	go http.Serve(l, nil)
 
 	s.Run(*debug)
@@ -47,19 +49,22 @@ func seedRand(address string) error {
 	if _, err := hashAlg.Write(b); err != nil {
 		return err
 	}
+	if _, err := hashAlg.Write([]byte(time.Now().String())); err != nil {
+		return err
+	}
 	hashSum := hashAlg.Sum64()
 
 	rand.Seed(int64(hashSum))
 	return nil
 }
 
-func registerServer(s *server.Server) net.Listener {
+func registerServer(s *server.Server, o server.ClusterOptions) net.Listener {
 	if err := rpc.Register(s); err != nil {
 		log.Fatalln("Failed to register:", err)
 	}
 	rpc.HandleHTTP()
 
-	l, err := net.Listen("tcp", s.MemberID)
+	l, err := net.Listen("tcp", o.Address)
 	if err != nil {
 		log.Fatalln("Failed to listen:", err)
 	}

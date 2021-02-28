@@ -1,8 +1,10 @@
 package server
 
 import (
+	"log"
+
+	"github.com/DerGut/kv-store/raft/state"
 	"github.com/DerGut/kv-store/replog"
-	"github.com/DerGut/kv-store/state"
 )
 
 func sendHeartBeat(options ClusterOptions, stateC chan state.State, resetC chan memberState) {
@@ -39,6 +41,7 @@ func doSendHeartbeats(state state.State, cluster Cluster, req AppendEntriesReque
 		case res := <-resC:
 			if isBehind(state, res.Term) {
 				state.UpdateTerm(res.Term)
+				log.Println("Discovered new term from heartbeat, reverting to FOLLOWER")
 				resetC <- Follower
 				return state
 			}

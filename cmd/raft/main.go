@@ -8,8 +8,8 @@ import (
 	"github.com/DerGut/kv-store/cmd/raft/app"
 	"github.com/DerGut/kv-store/raft"
 	"github.com/DerGut/kv-store/raft/rpc"
+	"github.com/DerGut/kv-store/raft/state"
 	"github.com/DerGut/kv-store/server"
-	"github.com/DerGut/kv-store/state"
 )
 
 var debug = flag.Bool("debug", false, "Enable debug mode")

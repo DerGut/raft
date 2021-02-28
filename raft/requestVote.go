@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/DerGut/kv-store/raft/rpc"
+	"github.com/DerGut/kv-store/raft/state"
 	"github.com/DerGut/kv-store/replog"
-	"github.com/DerGut/kv-store/state"
 )
 
 func doProcessRequestVote(req rpc.RequestVoteRequest, s state.State) (res rpc.RequestVoteResponse) {
