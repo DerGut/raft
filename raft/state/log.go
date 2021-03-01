@@ -13,12 +13,12 @@ type Log []Entry
 
 func (l Log) DeleteConflictingEntries(prevLogIndex int, entries []Entry) Log {
 	// Iterate over unsynced entries
-	for i := prevLogIndex; i < l.LastIndex(); i++ {
+	for i := prevLogIndex; i <= l.LastIndex(); i++ {
 		newEntryIndex := i - prevLogIndex
 		if newEntryIndex >= len(entries) {
 			return l
 		}
-		if l[i].Term != entries[newEntryIndex].Term {
+		if l.TermAt(i) != entries[newEntryIndex].Term {
 			l = l[:i] // Delete this entry and all following
 			break
 		}
@@ -51,7 +51,7 @@ func (l Log) MatchesUntilNow(prevLogIndex int, prevLogTerm Term) bool {
 	}
 
 	// prevLogIndex-1 for 1-based index correction
-	return l[prevLogIndex-1].Term == prevLogTerm
+	return l.TermAt(prevLogIndex) == prevLogTerm
 }
 
 func (l Log) IsMoreUpToDateThan(lastLogIndex int, lastLogTerm Term) bool {
@@ -76,23 +76,27 @@ func (l Log) LastIndex() int {
 }
 
 func (l Log) LastTerm() Term {
-	if len(l) == 0 {
-		return 0
-	}
-	return l[len(l)-1].Term
+	return l.TermAt(len(l))
 }
 
-func (l Log) At(index int) Entry {
-	// Index should be at least 1
-	return l[index-1]
+func (l Log) At(idx int) Entry {
+	// idx should be at least 1
+	return l[idx-1]
+}
+
+func (l Log) TermAt(idx int) Term {
+	if idx == 0 {
+		return 0
+	}
+	return l.At(idx).Term
 }
 
 func (l Log) Since(prevIndex int) []Entry {
-	if prevIndex >= l.LastIndex() || prevIndex < 1 {
+	if prevIndex >= l.LastIndex() {
 		return []Entry{}
 	}
 
-	return l[prevIndex:]
+	return l[prevIndex+1:]
 }
 
 // Equal returns true if x and y equal each other

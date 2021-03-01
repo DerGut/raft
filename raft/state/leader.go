@@ -40,17 +40,14 @@ func (s *LeaderState) sortedMatchIndices() []int {
 	return matchIndices
 }
 
-func (s *LeaderState) UpdateNextAndMatchingIndices(member string, success bool, lastIndex int) bool {
-	if success {
-		s.NextIndex[member] = lastIndex
-		s.MatchIndex[member] = lastIndex
-		return true
-	}
+func (s *LeaderState) UpdateIndices(member string, newIndex int) {
+	s.NextIndex[member] = newIndex
+	s.MatchIndex[member] = newIndex
+}
 
+func (s *LeaderState) DecrementNextIndex(member string) {
 	log.Println("Didn't succeed, decrementing nextIndex[", member, "]")
-	if s.NextIndex[member] > 0 {
+	if s.NextIndex[member] > 1 {
 		s.NextIndex[member]--
 	}
-
-	return false
 }
