@@ -5,7 +5,6 @@ import (
 
 	"github.com/DerGut/kv-store/raft/rpc"
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 )
 
 func doProcessAppendEntries(req rpc.AppendEntriesRequest, s state.State) rpc.AppendEntriesResponse {
@@ -25,7 +24,7 @@ func doProcessAppendEntries(req rpc.AppendEntriesRequest, s state.State) rpc.App
 	return rpc.AppendEntriesResponse{Success: validLeader, Term: s.CurrentTerm()}
 }
 
-func isValidLeader(req rpc.AppendEntriesRequest, currentTerm replog.Term, l replog.Log) bool {
+func isValidLeader(req rpc.AppendEntriesRequest, currentTerm state.Term, l state.Log) bool {
 	if isBehind(req.Term, currentTerm) {
 		log.Println("req is behind", req.Term, currentTerm)
 		return false

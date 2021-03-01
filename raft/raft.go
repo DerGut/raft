@@ -11,6 +11,7 @@ import (
 )
 
 // TODO: use function
+const debugInterval = 1 * time.Minute
 const electionTimeout = 10000 * time.Millisecond
 const heartbeatTimeout = 500 * time.Millisecond
 
@@ -58,7 +59,11 @@ func (r *Raft) Run() {
 		case req := <-r.ClientReceiver.ClientRequests:
 			log.Println("Processing ClientRequest")
 			r.ClientResponses <- r.processClientRequest(ctx, req)
+		case <-time.NewTicker(debugInterval).C:
+			log.Printf("Tick: %#v", *r)
+			log.Printf("Tock: %#v", r.State)
 		}
+		ctx, cancel = context.WithCancel(context.Background())
 	}
 }
 
@@ -101,7 +106,7 @@ func (r *Raft) runElection(ctx context.Context) {
 		r.membership = leader
 		r.State = state.NewLeaderStateFromState(r.State, r.Members)
 		r.heartbeatTicker = time.NewTicker(heartbeatTimeout)
-		r.State.AppendToLog("")
+		r.State.AppendToLog([]string{""})
 		log.Println("Sent initial heartbeat")
 		r.heartbeat(ctx)
 	} else {
@@ -134,7 +139,7 @@ func (r *Raft) processClientRequest(ctx context.Context, req rpc.ClientRequestRe
 
 func (r *Raft) forwardToLeader(req rpc.ClientRequestRequest) rpc.ClientRequestResponse {
 	if r.currentLeader != nil {
-		log.Println("Forwarding client to leader", r.currentLeader)
+		log.Println("Forwarding client to leader", *r.currentLeader)
 		return rpc.ClientRequestResponse{Success: false, LeaderAddr: *r.currentLeader}
 	}
 

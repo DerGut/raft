@@ -5,7 +5,7 @@ import (
 	"net/rpc"
 	"time"
 
-	"github.com/DerGut/kv-store/replog"
+	"github.com/DerGut/kv-store/raft/state"
 )
 
 const (
@@ -17,33 +17,33 @@ const (
 )
 
 type AppendEntriesRequest struct {
-	replog.Term
+	state.Term
 	LeaderID     string
 	PrevLogIndex int
-	PrevLogTerm  replog.Term
-	Entries      []replog.Entry
+	PrevLogTerm  state.Term
+	Entries      []state.Entry
 	LeaderCommit int
 }
 
 type AppendEntriesResponse struct {
-	replog.Term
+	state.Term
 	Success bool
 }
 
 type RequestVoteRequest struct {
-	replog.Term
+	state.Term
 	CandidateID  string
 	LastLogIndex int
-	LastLogTerm  replog.Term
+	LastLogTerm  state.Term
 }
 
 type RequestVoteResponse struct {
-	replog.Term
+	state.Term
 	VoteGranted bool
 }
 
 type ClientRequestRequest struct {
-	Cmd string
+	Cmds []string
 }
 type ClientRequestResponse struct {
 	Success    bool

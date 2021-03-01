@@ -1,7 +1,5 @@
 package raft
 
-import (
-	"github.com/DerGut/kv-store/replog"
-)
+import "github.com/DerGut/kv-store/raft/state"
 
-func isBehind(reqTerm, currentTerm replog.Term) bool { return reqTerm < currentTerm }
+func isBehind(reqTerm, currentTerm state.Term) bool { return reqTerm < currentTerm }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/DerGut/kv-store/raft/rpc"
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 )
 
 func doProcessRequestVote(req rpc.RequestVoteRequest, s state.State) (res rpc.RequestVoteResponse) {
@@ -23,7 +22,7 @@ func doProcessRequestVote(req rpc.RequestVoteRequest, s state.State) (res rpc.Re
 	return rpc.RequestVoteResponse{VoteGranted: false, Term: s.CurrentTerm()}
 }
 
-func isValidCandidate(req rpc.RequestVoteRequest, currentTerm replog.Term) bool {
+func isValidCandidate(req rpc.RequestVoteRequest, currentTerm state.Term) bool {
 	return !isBehind(req.Term, currentTerm)
 }
 

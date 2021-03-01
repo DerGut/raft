@@ -30,7 +30,7 @@ func main() {
 
 	var res *rpc.ClientRequestResponse
 
-	req := rpc.ClientRequestRequest{Cmd: *cmd}
+	req := rpc.ClientRequestRequest{Cmds: []string{*cmd}}
 	res, err := rpc.ClientRequest(req, member)
 	if err != nil {
 		log.Fatalln("Failed with", err)

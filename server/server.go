@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 	"github.com/DerGut/kv-store/timer"
 )
 
@@ -136,16 +135,16 @@ func (s *Server) setMembership(m memberState) {
 }
 
 type AppendEntriesRequest struct {
-	replog.Term
+	state.Term
 	LeaderID     string
 	PrevLogIndex int
-	PrevLogTerm  replog.Term
-	Entries      []replog.Entry
+	PrevLogTerm  state.Term
+	Entries      []state.Entry
 	LeaderCommit int
 }
 
 type AppendEntriesResponse struct {
-	replog.Term
+	state.Term
 	Success bool
 }
 
@@ -186,13 +185,13 @@ func processAppendEntries(s state.State, req AppendEntriesRequest, resetC chan m
 }
 
 type RequestVoteRequest struct {
-	replog.Term
+	state.Term
 	CandidateID  string
 	LastLogIndex int
-	LastLogTerm  replog.Term
+	LastLogTerm  state.Term
 }
 type RequestVoteResponse struct {
-	replog.Term
+	state.Term
 	VoteGranted bool
 }
 
@@ -240,19 +239,19 @@ func processRequestVote(s state.State, req RequestVoteRequest, resetC chan membe
 
 // isAhead compares the currentTerm with the term received by an RPC.
 // it returns true, if the receivers term is ahead of the senders, false if it is not. (§5.1)
-func isAhead(s state.State, term replog.Term) bool {
+func isAhead(s state.State, term state.Term) bool {
 	return s.CurrentTerm() > term
 }
 
-func isBehind(s state.State, term replog.Term) bool {
+func isBehind(s state.State, term state.Term) bool {
 	return s.CurrentTerm() < term
 }
 
-func responseTerm(reqTerm, currentTerm replog.Term) replog.Term {
+func responseTerm(reqTerm, currentTerm state.Term) state.Term {
 	return maxTerm(reqTerm, currentTerm)
 }
 
-func maxTerm(x, y replog.Term) replog.Term {
+func maxTerm(x, y state.Term) state.Term {
 	max := math.Max(float64(x), float64(y))
-	return replog.Term(max)
+	return state.Term(max)
 }

@@ -1,6 +1,10 @@
 package raft
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/DerGut/kv-store/raft/state"
+)
 
 func TestLeaderState_majorityMatches(t *testing.T) {
 	type fields struct {
@@ -36,11 +40,11 @@ func TestLeaderState_majorityMatches(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &LeaderState{
-				nextIndex:  tt.fields.nextIndex,
-				matchIndex: tt.fields.matchIndex,
+			s := &state.LeaderState{
+				NextIndex:  tt.fields.nextIndex,
+				MatchIndex: tt.fields.matchIndex,
 			}
-			if got := s.majorityMatches(); got != tt.want {
+			if got := s.MajorityMatches(); got != tt.want {
 				t.Errorf("LeaderState.majorityMatches() = %v, want %v", got, tt.want)
 			}
 		})

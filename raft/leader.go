@@ -6,7 +6,6 @@ import (
 
 	"github.com/DerGut/kv-store/raft/rpc"
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 	"github.com/DerGut/kv-store/server"
 )
 
@@ -16,7 +15,7 @@ func doHeartbeat(ctx context.Context, s state.State, options server.ClusterOptio
 
 func (r *Raft) applyCommand(ctx context.Context, req rpc.ClientRequestRequest) rpc.ClientRequestResponse {
 	log.Println("Applying command", req)
-	r.State.AppendToLog(req.Cmd)
+	r.State.AppendToLog(req.Cmds)
 	if ok := updateFollowers(ctx, r.State.(state.LeaderState), r.ClusterOptions); ok {
 		return rpc.ClientRequestResponse{Success: true}
 	}
@@ -61,7 +60,7 @@ func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options se
 				log.Println("Discovered new term from heartbeat")
 				return false
 			}
-			ok := s.UpdateNextAndMatchingIndices(res.member, *res.AppendEntriesResponse, s.Log().LastIndex())
+			ok := s.UpdateNextAndMatchingIndices(res.member, res.AppendEntriesResponse.Success, s.Log().LastIndex())
 			if ok {
 				numSucceeded++
 				continue
@@ -90,19 +89,19 @@ func appendEntries(ctx context.Context, member string, req rpc.AppendEntriesRequ
 	}()
 }
 
-func buildAppendEntriesRequest(state state.State, leaderID string, prevIndex int, entries []replog.Entry) rpc.AppendEntriesRequest {
-	var prevLogTerm replog.Term
+func buildAppendEntriesRequest(s state.State, leaderID string, prevIndex int, entries []state.Entry) rpc.AppendEntriesRequest {
+	var prevLogTerm state.Term
 	if prevIndex == 0 {
 		prevLogTerm = 0
 	} else {
-		prevLogTerm = state.Log().At(prevIndex).Term
+		prevLogTerm = s.Log().At(prevIndex).Term
 	}
 	return rpc.AppendEntriesRequest{
-		Term:         state.CurrentTerm(),
+		Term:         s.CurrentTerm(),
 		LeaderID:     leaderID,
 		PrevLogIndex: prevIndex,
 		PrevLogTerm:  prevLogTerm,
 		Entries:      entries,
-		LeaderCommit: state.CommitIndex(),
+		LeaderCommit: s.CommitIndex(),
 	}
 }

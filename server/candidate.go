@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 )
 
 func startElection(ctx context.Context, options ClusterOptions, stateC chan state.State, resetC chan memberState) {
@@ -92,9 +91,9 @@ func isMajority(votes, clusterSize int) bool {
 	return ratio > 0.5
 }
 
-func appendNoOpEntry(state state.State) state.State {
-	e := replog.Entry{Term: state.CurrentTerm(), Cmd: ""}
-	l := state.Log().Append(e)
-	state.SetLog(l)
-	return state
+func appendNoOpEntry(s state.State) state.State {
+	e := []state.Entry{{Term: s.CurrentTerm(), Cmd: ""}}
+	l := s.Log().Append(e)
+	s.SetLog(l)
+	return s
 }

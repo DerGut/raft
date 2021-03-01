@@ -3,8 +3,6 @@ package state
 import (
 	"log"
 	"sort"
-
-	"github.com/DerGut/kv-store/raft/rpc"
 )
 
 type LeaderState struct {
@@ -13,7 +11,7 @@ type LeaderState struct {
 	MatchIndex map[string]int
 }
 
-func NewLeaderStateFromState(state State, members []string) *LeaderState {
+func NewLeaderStateFromState(state State, members []string) LeaderState {
 	clusterSize := len(members)
 	nextIndex := make(map[string]int, clusterSize)
 	matchIndex := make(map[string]int, clusterSize)
@@ -22,7 +20,7 @@ func NewLeaderStateFromState(state State, members []string) *LeaderState {
 		nextIndex[member] = state.Log().LastIndex() + 1
 	}
 
-	return &LeaderState{state, nextIndex, matchIndex}
+	return LeaderState{state, nextIndex, matchIndex}
 }
 
 func (s *LeaderState) MajorityMatches() int {
@@ -42,8 +40,8 @@ func (s *LeaderState) sortedMatchIndices() []int {
 	return matchIndices
 }
 
-func (s *LeaderState) UpdateNextAndMatchingIndices(member string, res rpc.AppendEntriesResponse, lastIndex int) bool {
-	if res.Success {
+func (s *LeaderState) UpdateNextAndMatchingIndices(member string, success bool, lastIndex int) bool {
+	if success {
 		s.NextIndex[member] = lastIndex
 		s.MatchIndex[member] = lastIndex
 		return true

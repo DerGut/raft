@@ -1,4 +1,4 @@
-package replog
+package state
 
 import "fmt"
 
@@ -26,8 +26,8 @@ func (l Log) DeleteConflictingEntries(prevLogIndex int, entries []Entry) Log {
 	return l
 }
 
-func (l Log) Append(entry Entry) Log {
-	return append(l, entry)
+func (l Log) Append(entries []Entry) Log {
+	return append(l, entries...)
 }
 
 func (l Log) AppendEntries(prevLogIndex int, entries []Entry) Log {
@@ -96,7 +96,7 @@ func (l Log) Since(prevIndex int) []Entry {
 }
 
 // Equal returns true if x and y equal each other
-func Equal(x, y Log) bool {
+func LogsEqual(x, y Log) bool {
 	if len(x) != len(y) {
 		return false
 	}

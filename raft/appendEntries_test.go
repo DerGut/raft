@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	"github.com/DerGut/kv-store/raft/rpc"
-	"github.com/DerGut/kv-store/replog"
-	"github.com/DerGut/kv-store/state"
+	"github.com/DerGut/kv-store/raft/state"
 )
 
 func Test_processAppendEntries(t *testing.T) {
@@ -25,9 +24,9 @@ func Test_processAppendEntries(t *testing.T) {
 				rpc.AppendEntriesRequest{
 					Term: 0,
 				},
-				state.NewTestState(1, nil, replog.Log{}, 0),
+				state.NewTestState(1, nil, state.Log{}, 0),
 			},
-			state.NewTestState(1, nil, replog.Log{}, 0),
+			state.NewTestState(1, nil, state.Log{}, 0),
 			rpc.AppendEntriesResponse{Success: false, Term: 1},
 		},
 		{
@@ -36,9 +35,9 @@ func Test_processAppendEntries(t *testing.T) {
 				rpc.AppendEntriesRequest{
 					Term: 2,
 				},
-				state.NewTestState(1, nil, replog.Log{}, 0),
+				state.NewTestState(1, nil, state.Log{}, 0),
 			},
-			state.NewTestState(2, nil, replog.Log{}, 0),
+			state.NewTestState(2, nil, state.Log{}, 0),
 			rpc.AppendEntriesResponse{Success: true, Term: 2},
 		},
 		{
@@ -48,9 +47,9 @@ func Test_processAppendEntries(t *testing.T) {
 					Term:         1,
 					PrevLogIndex: 1,
 				},
-				state.NewTestState(1, nil, replog.Log{}, 0),
+				state.NewTestState(1, nil, state.Log{}, 0),
 			},
-			state.NewTestState(1, nil, replog.Log{}, 0),
+			state.NewTestState(1, nil, state.Log{}, 0),
 			rpc.AppendEntriesResponse{Success: false, Term: 1},
 		},
 		{
@@ -61,9 +60,9 @@ func Test_processAppendEntries(t *testing.T) {
 					PrevLogIndex: 1,
 					PrevLogTerm:  1,
 				},
-				state.NewTestState(1, nil, replog.Log{replog.Entry{Term: 0}}, 0),
+				state.NewTestState(1, nil, state.Log{state.Entry{Term: 0}}, 0),
 			},
-			state.NewTestState(1, nil, replog.Log{replog.Entry{Term: 0}}, 0),
+			state.NewTestState(1, nil, state.Log{state.Entry{Term: 0}}, 0),
 			rpc.AppendEntriesResponse{Success: false, Term: 1},
 		},
 		{
@@ -71,11 +70,11 @@ func Test_processAppendEntries(t *testing.T) {
 			args{
 				rpc.AppendEntriesRequest{
 					PrevLogIndex: 1,
-					Entries:      []replog.Entry{{Term: 1}, {Term: 1}},
+					Entries:      []state.Entry{{Term: 1}, {Term: 1}},
 				},
-				state.NewTestState(0, nil, replog.Log{replog.Entry{}, replog.Entry{}, replog.Entry{}}, 0),
+				state.NewTestState(0, nil, state.Log{state.Entry{}, state.Entry{}, state.Entry{}}, 0),
 			},
-			state.NewTestState(0, nil, replog.Log{replog.Entry{}, replog.Entry{Term: 1}, replog.Entry{Term: 1}}, 0),
+			state.NewTestState(0, nil, state.Log{state.Entry{}, state.Entry{Term: 1}, state.Entry{Term: 1}}, 0),
 			rpc.AppendEntriesResponse{Success: true, Term: 0},
 		},
 		{
@@ -85,11 +84,11 @@ func Test_processAppendEntries(t *testing.T) {
 					PrevLogIndex: 0,
 					PrevLogTerm:  0,
 					LeaderCommit: 1,
-					Entries:      []replog.Entry{{}},
+					Entries:      []state.Entry{{}},
 				},
-				state.NewTestState(0, nil, replog.Log{}, 0),
+				state.NewTestState(0, nil, state.Log{}, 0),
 			},
-			state.NewTestState(0, nil, replog.Log{replog.Entry{}}, 1),
+			state.NewTestState(0, nil, state.Log{state.Entry{}}, 1),
 			rpc.AppendEntriesResponse{Success: true},
 		},
 	}

@@ -4,20 +4,19 @@ import (
 	"log"
 
 	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/replog"
 )
 
 func sendHeartBeat(options ClusterOptions, stateC chan state.State, resetC chan memberState) {
-	state := <-stateC
+	s := <-stateC
 
-	req := buildAppendEntriesRequest(state, options.Address, []replog.Entry{})
+	req := buildAppendEntriesRequest(s, options.Address, []state.Entry{})
 	cluster := NewCluster(options.Members)
-	state = doSendHeartbeats(state, cluster, req, resetC)
+	s = doSendHeartbeats(s, cluster, req, resetC)
 
-	stateC <- state
+	stateC <- s
 }
 
-func buildAppendEntriesRequest(state state.State, memberID string, entries []replog.Entry) AppendEntriesRequest {
+func buildAppendEntriesRequest(state state.State, memberID string, entries []state.Entry) AppendEntriesRequest {
 	l := state.Log()
 	return AppendEntriesRequest{
 		Term:         state.CurrentTerm(),
