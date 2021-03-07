@@ -68,7 +68,7 @@ func (s *Server) Run(debug bool) {
 	s.timer = s.electionTimer()
 
 	go func() {
-		s.state <- state.NewState()
+		s.state <- state.NewState(nil)
 	}()
 
 	for {
@@ -178,7 +178,7 @@ func processAppendEntries(s state.State, req AppendEntriesRequest, resetC chan m
 	}
 
 	s.DeleteConflictingAndAddNewEntries(req.PrevLogIndex, req.Entries)
-	s.UpdateCommitIndexIfStale(req.LeaderCommit)
+	s.FollowerCommit(req.LeaderCommit)
 
 	res.Success = true
 	return s, res

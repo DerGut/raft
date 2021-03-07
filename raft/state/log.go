@@ -99,6 +99,10 @@ func (l Log) Since(prevIndex int) []Entry {
 	return l[prevIndex+1:]
 }
 
+func (l Log) Between(prevIndex, until int) []Entry {
+	return l[prevIndex:until]
+}
+
 // Equal returns true if x and y equal each other
 func LogsEqual(x, y Log) bool {
 	if len(x) != len(y) {

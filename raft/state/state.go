@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"math"
 )
 
 type State interface {
@@ -17,14 +16,15 @@ type State interface {
 	SetLog(l Log)
 	AppendToLog([]string)
 	CommitIndex() int
-	SetCommitIndex(int)
-	UpdateCommitIndex(int)
-	UpdateCommitIndexIfStale(leaderCommit int)
+	LeaderCommit(int)
+	FollowerCommit(int)
 	String() string
 }
 
 // State describes the state of the raft algorithm, a server is in
 type state struct {
+	Machine
+
 	// latest term server has seen
 	// (initialized to 0 on first boot, increases monotonically)
 	currentTerm Term
@@ -41,8 +41,9 @@ type state struct {
 }
 
 // NewState returns a freshly initialized server state
-func NewState() State {
+func NewState(m Machine) State {
 	return &state{
+		Machine:     m,
 		currentTerm: 0,
 		votedFor:    nil,
 		log:         Log{},
@@ -51,7 +52,7 @@ func NewState() State {
 }
 
 func NewTestState(term Term, votedFor *string, log Log, commitIndex int) State {
-	return &state{term, votedFor, log, commitIndex}
+	return &state{nil, term, votedFor, log, commitIndex}
 }
 
 // CurrentTerm returns the latest term the server has seen
@@ -111,27 +112,46 @@ func (s *state) CommitIndex() int {
 	return s.commitIndex
 }
 
-func (s *state) SetCommitIndex(index int) {
+func (s *state) setCommitIndex(index int) {
 	s.commitIndex = index
 }
 
-func (s *state) UpdateCommitIndex(majorityMatch int) {
-	for i := s.CommitIndex() + 1; i <= majorityMatch; i++ {
-		if i > s.Log().LastIndex() {
-			return
-		}
-		if s.Log().At(i).Term == s.CurrentTerm() {
-			s.SetCommitIndex(i)
-		}
+func (s *state) LeaderCommit(majorityMatch int) {
+	new := s.highestMajorityMatch(majorityMatch)
+	if new > s.CommitIndex() {
+		s.commit(new)
 	}
 }
 
-func (s *state) UpdateCommitIndexIfStale(leaderCommit int) {
-	if leaderCommit > s.commitIndex {
-		lc := float64(leaderCommit)
-		idx := float64(s.log.LastIndex())
-		s.commitIndex = int(math.Min(lc, idx))
+func (s *state) FollowerCommit(leaderCommit int) {
+	new := s.leaderCommitOrLogLength(leaderCommit)
+	s.commit(new)
+}
+
+func (s *state) commit(newCommitIndex int) {
+	toCommit := s.log.Between(s.commitIndex, newCommitIndex)
+	s.Machine.Commit(EntriesToCommands(toCommit))
+	s.setCommitIndex(newCommitIndex)
+}
+
+func (s *state) leaderCommitOrLogLength(leaderCommit int) int {
+	if leaderCommit > s.log.LastIndex() {
+		return s.log.LastIndex()
 	}
+	return leaderCommit
+}
+
+func (s *state) highestMajorityMatch(majorityMatch int) int {
+	for i := majorityMatch; i > s.CommitIndex(); i-- {
+		if i > s.Log().LastIndex() {
+			continue
+		}
+		if s.log.TermAt(i) == s.CurrentTerm() {
+			return i
+		}
+	}
+
+	return s.CommitIndex()
 }
 
 // Equal returns true if x and y equal each other
@@ -152,7 +172,7 @@ func Equal(x, y State) bool {
 	return x.CommitIndex() == y.CommitIndex()
 }
 
-func makeString(s State) string {
+func (s *state) String() string {
 	var vote string
 	if s.VotedFor() == nil {
 		vote = "<nil>"
@@ -162,6 +182,10 @@ func makeString(s State) string {
 	return fmt.Sprintf("State{%d: %s \t %d: %s}", s.CurrentTerm(), vote, s.CommitIndex(), s.Log().String())
 }
 
-func (s *state) String() string {
-	return makeString(s)
+func EntriesToCommands(entries []Entry) []string {
+	cmds := make([]string, len(entries))
+	for i, e := range entries {
+		cmds[i] = e.Cmd
+	}
+	return cmds
 }

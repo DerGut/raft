@@ -44,7 +44,6 @@ func updateFollowers(ctx context.Context, s state.LeaderState, options server.Cl
 // Should return after majority has been reached but continue to run in the background until rest of the cluster has agreed.
 // Should be cancellable during all of the operation.
 func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options server.ClusterOptions, resCh chan memberResponse) bool {
-	log.Println("Awaiting responses")
 	numAgreed := 1
 	clusterSize := len(options.Members) + 1
 	for !isMajority(numAgreed, clusterSize) {
@@ -57,7 +56,7 @@ func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options se
 		}
 	}
 
-	s.UpdateCommitIndex(s.MajorityMatches())
+	s.LeaderCommit(s.MajorityMatches())
 
 	// TODO: Retry for rest of cluster
 

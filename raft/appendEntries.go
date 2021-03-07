@@ -16,7 +16,9 @@ func doProcessAppendEntries(req rpc.AppendEntriesRequest, s state.State) rpc.App
 	if validLeader {
 		log.Println("leader is valid")
 		s.DeleteConflictingAndAddNewEntries(req.PrevLogIndex, req.Entries)
-		s.UpdateCommitIndexIfStale(req.LeaderCommit)
+		if req.LeaderCommit > s.CommitIndex() {
+			s.FollowerCommit(req.LeaderCommit)
+		}
 	} else {
 		log.Println("Leader is not valid")
 	}

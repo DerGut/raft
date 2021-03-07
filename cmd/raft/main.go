@@ -47,9 +47,10 @@ func main() {
 
 	go http.Serve(l, nil)
 
+	m := app.StateMachine{}
 	r := raft.Raft{
 		ClusterOptions:  server.ClusterOptions{Address: *address, Members: members},
-		State:           state.NewState(),
+		State:           state.NewState(&m),
 		ClusterReceiver: clusterRcvr,
 		ClientReceiver:  clientRcvr,
 	}
