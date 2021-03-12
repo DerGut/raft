@@ -44,10 +44,7 @@ func (l Log) MatchesUntilNow(prevLogIndex int, prevLogTerm Term) bool {
 		return false
 	}
 	if l.LastIndex() == 0 {
-		if prevLogTerm == 0 {
-			return true
-		}
-		return false
+		return prevLogTerm == 0
 	}
 
 	// prevLogIndex-1 for 1-based index correction

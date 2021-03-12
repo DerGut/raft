@@ -74,6 +74,7 @@ func stoppedTicker(d time.Duration) *time.Ticker {
 }
 
 func (r *Raft) processAppendEntries(cancel context.CancelFunc, req rpc.AppendEntriesRequest) rpc.AppendEntriesResponse {
+	defer r.State.Persist()
 	res := doProcessAppendEntries(req, r.State)
 	if res.Success {
 		cancel()
@@ -85,8 +86,8 @@ func (r *Raft) processAppendEntries(cancel context.CancelFunc, req rpc.AppendEnt
 }
 
 func (r *Raft) processRequestVote(cancel context.CancelFunc, req rpc.RequestVoteRequest) rpc.RequestVoteResponse {
+	defer r.State.Persist()
 	res := doProcessRequestVote(req, r.State)
-	Debug.Println(res)
 	if res.VoteGranted {
 		cancel()
 		r.membership = follower
@@ -96,6 +97,8 @@ func (r *Raft) processRequestVote(cancel context.CancelFunc, req rpc.RequestVote
 }
 
 func (r *Raft) runElection(ctx context.Context) {
+	defer r.State.Persist()
+
 	r.membership = candidate
 	success := doRunElection(ctx, r.State, r.ClusterOptions)
 	if success {
@@ -118,6 +121,7 @@ func (r *Raft) runElection(ctx context.Context) {
 }
 
 func (r *Raft) heartbeat(ctx context.Context) {
+	defer r.State.Persist()
 	ok := doHeartbeat(ctx, r.State, r.ClusterOptions)
 
 	if !ok {
@@ -128,12 +132,14 @@ func (r *Raft) heartbeat(ctx context.Context) {
 }
 
 func (r *Raft) processClientRequest(ctx context.Context, req rpc.ClientRequestRequest) rpc.ClientRequestResponse {
+	defer r.State.Persist()
 	var res rpc.ClientRequestResponse
 	if r.membership == leader {
 		res = r.applyCommand(ctx, req)
 	} else {
 		res = r.forwardToLeader(req)
 	}
+	r.State.Persist()
 	return res
 }
 

@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/DerGut/raft/pkg/app"
 )
@@ -21,11 +22,14 @@ type State interface {
 	LeaderCommit(int)
 	FollowerCommit(int)
 	String() string
+	Persist()
 }
 
 // State describes the state of the raft algorithm, a server is in
 type state struct {
 	app.StateMachine
+
+	cleanCh chan struct{}
 	durable Durable
 
 	// index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -38,15 +42,19 @@ func NewState(m app.StateMachine, dirpath string) (State, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	c := make(chan struct{})
+	go d.Clean(c)
 	return &state{
 		StateMachine: m,
+		cleanCh:      c,
 		durable:      *d,
 		commitIndex:  0,
 	}, nil
 }
 
 func NewTestState(term Term, votedFor *string, log Log, commitIndex int) State {
-	return &state{nil, Durable{}, commitIndex}
+	return &state{nil, nil, Durable{}, commitIndex}
 }
 
 // CurrentTerm returns the latest term the server has seen
@@ -182,4 +190,10 @@ func EntriesToCommands(entries []Entry) []string {
 		cmds[i] = e.Cmd
 	}
 	return cmds
+}
+
+func (s *state) Persist() {
+	if err := s.durable.Write(); err != nil {
+		log.Println("Failed to persist state", err)
+	}
 }
