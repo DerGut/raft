@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/DerGut/kv-store/raft/state"
+	"github.com/DerGut/raft/raft/state"
 )
 
 func startElection(ctx context.Context, options ClusterOptions, stateC chan state.State, resetC chan memberState) {

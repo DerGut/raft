@@ -5,7 +5,7 @@ import (
 	"net/rpc"
 	"time"
 
-	"github.com/DerGut/kv-store/raft/state"
+	"github.com/DerGut/raft/raft/state"
 )
 
 const (

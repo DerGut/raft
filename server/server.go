@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/timer"
+	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/timer"
 )
 
 type memberState int
@@ -68,7 +68,8 @@ func (s *Server) Run(debug bool) {
 	s.timer = s.electionTimer()
 
 	go func() {
-		s.state <- state.NewState(nil)
+		new, _ := state.NewState(nil, "")
+		s.state <- new
 	}()
 
 	for {

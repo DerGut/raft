@@ -24,79 +24,71 @@ type State interface {
 // State describes the state of the raft algorithm, a server is in
 type state struct {
 	Machine
-
-	// latest term server has seen
-	// (initialized to 0 on first boot, increases monotonically)
-	currentTerm Term
-
-	// candidateId that received vote in current or (or nil if none)
-	votedFor *string
-
-	// log entries; each entry contains command for state machine,
-	// and term when entry was received by leader (first index is 1)
-	log Log
+	durable Durable
 
 	// index of highest log entry known to be committed (initialized to 0, increases monotonically)
 	commitIndex int
 }
 
 // NewState returns a freshly initialized server state
-func NewState(m Machine) State {
+func NewState(m Machine, dirpath string) (State, error) {
+	d, err := NewDurable(dirpath)
+	if err != nil {
+		return nil, err
+	}
 	return &state{
 		Machine:     m,
-		currentTerm: 0,
-		votedFor:    nil,
-		log:         Log{},
+		durable:     *d,
 		commitIndex: 0,
-	}
+	}, nil
 }
 
 func NewTestState(term Term, votedFor *string, log Log, commitIndex int) State {
-	return &state{nil, term, votedFor, log, commitIndex}
+	return &state{nil, Durable{}, commitIndex}
 }
 
 // CurrentTerm returns the latest term the server has seen
 func (s *state) CurrentTerm() Term {
-	return s.currentTerm
+	return s.durable.CurrentTerm
 }
 
 // IncrCurrentTerm increments the current term by one
 func (s *state) IncrCurrentTerm() {
-	s.currentTerm++
+	s.durable.CurrentTerm++
 }
 
 // UpdateTerm sets current term to the new term and resets votedFor
 func (s *state) UpdateTerm(new Term) {
-	s.currentTerm = new
-	s.votedFor = nil
+	s.durable.CurrentTerm = new
+	s.durable.VotedFor = nil
 }
 
 func (s *state) VotedFor() *string {
-	return s.votedFor
+	return s.durable.VotedFor
 }
 
 // CanVoteFor returns true if the server has not given a vote this term yet
 // or it has given a vote to the requesting server
 func (s *state) CanVoteFor(id string) bool {
-	return s.votedFor == nil || *s.votedFor == id
+	return s.durable.VotedFor == nil || *s.durable.VotedFor == id
 }
 
 func (s *state) SetVotedFor(id string) {
-	s.votedFor = &id
+	s.durable.VotedFor = &id
 }
 
 func (s *state) Log() Log {
-	return s.log
+	return s.durable.Log
 }
 
 func (s *state) DeleteConflictingAndAddNewEntries(prevLogIndex int, entries []Entry) {
-	l := s.log.DeleteConflictingEntries(prevLogIndex, entries)
+	l := s.durable.Log.DeleteConflictingEntries(prevLogIndex, entries)
 	l = l.AppendEntries(prevLogIndex, entries)
-	s.log = l
+	s.durable.Log = l
 }
 
 func (s *state) SetLog(l Log) {
-	s.log = l
+	s.durable.Log = l
 }
 
 func (s *state) AppendToLog(cmds []string) {
@@ -129,14 +121,14 @@ func (s *state) FollowerCommit(leaderCommit int) {
 }
 
 func (s *state) commit(newCommitIndex int) {
-	toCommit := s.log.Between(s.commitIndex, newCommitIndex)
+	toCommit := s.durable.Log.Between(s.commitIndex, newCommitIndex)
 	s.Machine.Commit(EntriesToCommands(toCommit))
 	s.setCommitIndex(newCommitIndex)
 }
 
 func (s *state) leaderCommitOrLogLength(leaderCommit int) int {
-	if leaderCommit > s.log.LastIndex() {
-		return s.log.LastIndex()
+	if leaderCommit > s.durable.Log.LastIndex() {
+		return s.durable.Log.LastIndex()
 	}
 	return leaderCommit
 }
@@ -146,7 +138,7 @@ func (s *state) highestMajorityMatch(majorityMatch int) int {
 		if i > s.Log().LastIndex() {
 			continue
 		}
-		if s.log.TermAt(i) == s.CurrentTerm() {
+		if s.durable.Log.TermAt(i) == s.CurrentTerm() {
 			return i
 		}
 	}

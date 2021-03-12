@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -20,28 +21,44 @@ type Durable struct {
 	Log         `json`
 }
 
-func NewDurable(dirpath string) *Durable {
+var errNoStateFile = errors.New("No state file")
+
+func NewDurable(dirpath string) (*Durable, error) {
 	file, err := latestWrite(dirpath)
 	if err != nil {
-		log.Println("Error reading files in path", dirpath, err, "creating new Durable")
-		return &Durable{}
+		if errors.Is(err, errNoStateFile) {
+			log.Println("No state file present in", dirpath, "creating new Durable")
+			return &Durable{}, nil
+		}
+		return nil, err
 	}
 
 	d, err := read(*file)
 	if err != nil {
-		log.Println("Error reading", *file, err, "creating new Durable")
-		return &Durable{}
+		return nil, err
 	}
-	return d
+	return d, nil
 }
 
 func latestWrite(dirpath string) (file *string, err error) {
 	files, err := ioutil.ReadDir(dirpath)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			log.Println(dirpath, "does not exist, trying to create")
+			err = os.MkdirAll(dirpath, 644)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	times := parseFileNames(files)
+	if len(times) == 0 {
+		return nil, errNoStateFile
+	}
+
 	sort.Slice(times, func(i, j int) bool {
 		return times[i].Before(times[j])
 	})

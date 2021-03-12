@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DerGut/kv-store/server"
+	"github.com/DerGut/raft/server"
 )
 
 type uris []string

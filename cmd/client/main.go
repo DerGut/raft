@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/DerGut/kv-store/raft/rpc"
+	"github.com/DerGut/raft/raft/rpc"
 )
 
 type uris []string

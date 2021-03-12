@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/DerGut/kv-store/raft/state"
+	"github.com/DerGut/raft/raft/state"
 )
 
 func Test_processRequestVote(t *testing.T) {

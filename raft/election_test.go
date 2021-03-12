@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/DerGut/kv-store/raft/rpc"
-	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/server"
+	"github.com/DerGut/raft/raft/rpc"
+	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/server"
 )
 
 func Test_doRunElection(t *testing.T) {

@@ -5,15 +5,16 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/DerGut/kv-store/cmd/raft/app"
-	"github.com/DerGut/kv-store/raft"
-	"github.com/DerGut/kv-store/raft/rpc"
-	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/server"
+	"github.com/DerGut/raft/cmd/raft/app"
+	"github.com/DerGut/raft/raft"
+	"github.com/DerGut/raft/raft/rpc"
+	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/server"
 )
 
 var debug = flag.Bool("debug", false, "Enable debug mode")
 var address = flag.String("address", "127.0.0.1:3000", "Address and port to listen for connections")
+var statePath = flag.String("state", "/etc/raft", "Directory path where to store persistent state")
 var members app.URIs
 
 func init() {
@@ -48,9 +49,13 @@ func main() {
 	go http.Serve(l, nil)
 
 	m := app.StateMachine{}
+	s, err := state.NewState(&m, *statePath)
+	if err != nil {
+		log.Fatalln("Failed to create state", err)
+	}
 	r := raft.Raft{
 		ClusterOptions:  server.ClusterOptions{Address: *address, Members: members},
-		State:           state.NewState(&m),
+		State:           s,
 		ClusterReceiver: clusterRcvr,
 		ClientReceiver:  clientRcvr,
 	}

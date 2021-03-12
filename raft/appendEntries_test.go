@@ -3,8 +3,8 @@ package raft
 import (
 	"testing"
 
-	"github.com/DerGut/kv-store/raft/rpc"
-	"github.com/DerGut/kv-store/raft/state"
+	"github.com/DerGut/raft/raft/rpc"
+	"github.com/DerGut/raft/raft/state"
 )
 
 func Test_processAppendEntries(t *testing.T) {

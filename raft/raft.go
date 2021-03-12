@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/DerGut/kv-store/raft/rpc"
-	"github.com/DerGut/kv-store/raft/state"
-	"github.com/DerGut/kv-store/server"
-	"github.com/DerGut/kv-store/timer"
+	"github.com/DerGut/raft/raft/rpc"
+	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/server"
+	"github.com/DerGut/raft/timer"
 )
 
 // TODO: use function
