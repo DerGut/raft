@@ -3,7 +3,7 @@ package raft
 import (
 	"testing"
 
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/state"
 )
 
 func TestLeaderState_majorityMatches(t *testing.T) {

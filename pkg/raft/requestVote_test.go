@@ -3,8 +3,8 @@ package raft
 import (
 	"testing"
 
-	"github.com/DerGut/raft/raft/rpc"
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/rpc"
+	"github.com/DerGut/raft/pkg/state"
 )
 
 func Test_processRequestVote(t *testing.T) {

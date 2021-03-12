@@ -3,8 +3,8 @@ package raft
 import (
 	"log"
 
-	"github.com/DerGut/raft/raft/rpc"
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/rpc"
+	"github.com/DerGut/raft/pkg/state"
 )
 
 func doProcessRequestVote(req rpc.RequestVoteRequest, s state.State) (res rpc.RequestVoteResponse) {

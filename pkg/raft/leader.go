@@ -5,8 +5,8 @@ import (
 	"errors"
 	"log"
 
-	"github.com/DerGut/raft/raft/rpc"
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/rpc"
+	"github.com/DerGut/raft/pkg/state"
 	"github.com/DerGut/raft/server"
 )
 

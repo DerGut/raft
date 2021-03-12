@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	"github.com/DerGut/raft/cmd/raft/app"
-	"github.com/DerGut/raft/raft"
-	"github.com/DerGut/raft/raft/rpc"
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/raft"
+	"github.com/DerGut/raft/pkg/rpc"
+	"github.com/DerGut/raft/pkg/state"
 	"github.com/DerGut/raft/server"
 )
 

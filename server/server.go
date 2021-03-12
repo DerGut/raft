@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/state"
 	"github.com/DerGut/raft/timer"
 )
 

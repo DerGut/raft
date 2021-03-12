@@ -2,6 +2,8 @@ package state
 
 import (
 	"fmt"
+
+	"github.com/DerGut/raft/pkg/app"
 )
 
 type State interface {
@@ -23,7 +25,7 @@ type State interface {
 
 // State describes the state of the raft algorithm, a server is in
 type state struct {
-	Machine
+	app.StateMachine
 	durable Durable
 
 	// index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -31,15 +33,15 @@ type state struct {
 }
 
 // NewState returns a freshly initialized server state
-func NewState(m Machine, dirpath string) (State, error) {
+func NewState(m app.StateMachine, dirpath string) (State, error) {
 	d, err := NewDurable(dirpath)
 	if err != nil {
 		return nil, err
 	}
 	return &state{
-		Machine:     m,
-		durable:     *d,
-		commitIndex: 0,
+		StateMachine: m,
+		durable:      *d,
+		commitIndex:  0,
 	}, nil
 }
 
@@ -122,7 +124,7 @@ func (s *state) FollowerCommit(leaderCommit int) {
 
 func (s *state) commit(newCommitIndex int) {
 	toCommit := s.durable.Log.Between(s.commitIndex, newCommitIndex)
-	s.Machine.Commit(EntriesToCommands(toCommit))
+	s.StateMachine.Commit(EntriesToCommands(toCommit))
 	s.setCommitIndex(newCommitIndex)
 }
 

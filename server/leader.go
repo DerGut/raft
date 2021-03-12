@@ -3,7 +3,7 @@ package server
 import (
 	"log"
 
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/state"
 )
 
 func sendHeartBeat(options ClusterOptions, stateC chan state.State, resetC chan memberState) {

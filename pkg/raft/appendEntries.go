@@ -3,8 +3,8 @@ package raft
 import (
 	"log"
 
-	"github.com/DerGut/raft/raft/rpc"
-	"github.com/DerGut/raft/raft/state"
+	"github.com/DerGut/raft/pkg/rpc"
+	"github.com/DerGut/raft/pkg/state"
 )
 
 func doProcessAppendEntries(req rpc.AppendEntriesRequest, s state.State) rpc.AppendEntriesResponse {
