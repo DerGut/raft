@@ -10,15 +10,21 @@ import (
 	"github.com/DerGut/raft/server"
 )
 
-func doHeartbeat(ctx context.Context, s state.State, options server.ClusterOptions) bool {
-	return updateFollowers(ctx, s.(state.LeaderState), options)
+func doHeartbeat(ctx context.Context, s state.State, options server.ClusterOptions) (ok bool) {
+	ls := s.(state.LeaderState)
+	if ok = updateFollowers(ctx, ls, options); ok {
+		s.LeaderCommit(ls.MajorityMatches())
+	}
+	return
 }
 
 func (r *Raft) applyCommand(ctx context.Context, req rpc.ClientRequestRequest) rpc.ClientRequestResponse {
 	log.Println("Applying command", req)
 	r.State.AppendToLog(req.Cmds)
-	if ok := updateFollowers(ctx, r.State.(state.LeaderState), r.ClusterOptions); ok {
-		return rpc.ClientRequestResponse{Success: true}
+	ls := r.State.(state.LeaderState)
+	if ok := updateFollowers(ctx, ls, r.ClusterOptions); ok {
+		ret := r.LeaderCommit(ls.MajorityMatches())
+		return rpc.ClientRequestResponse{Success: true, Return: ret}
 	}
 	return rpc.ClientRequestResponse{Success: false}
 }
@@ -56,8 +62,6 @@ func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options se
 		}
 	}
 
-	s.LeaderCommit(s.MajorityMatches())
-
 	// TODO: Retry for rest of cluster
 
 	return true
@@ -73,7 +77,7 @@ func awaitResponse(ctx context.Context, s state.LeaderState, leaderID string, re
 		if isBehind(s.CurrentTerm(), res.Term) {
 			s.UpdateTerm(res.Term)
 			log.Println("Discovered new term from heartbeat")
-			return false, errors.New("Revert to FOLLOWER")
+			return false, errors.New("revert to FOLLOWER")
 		}
 		if res.Success {
 			// TODO: lastIndex could be overwritten already once this is running in a goroutine

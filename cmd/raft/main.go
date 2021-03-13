@@ -48,7 +48,7 @@ func main() {
 
 	go http.Serve(l, nil)
 
-	m := app.StateMachine{}
+	m := app.KeyValueStore{Entries: make(map[string]string)}
 	s, err := state.NewState(&m, *statePath)
 	if err != nil {
 		log.Fatalln("Failed to create state", err)

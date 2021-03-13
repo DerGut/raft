@@ -3,8 +3,16 @@ package state
 import (
 	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
 
 	"github.com/DerGut/raft/pkg/app"
+)
+
+const (
+	snapshotSubDir   = "snap"
+	stateSubDir      = "state"
+	snapshottingSize = 1024
 )
 
 type State interface {
@@ -19,15 +27,18 @@ type State interface {
 	SetLog(l Log)
 	AppendToLog([]string)
 	CommitIndex() int
-	LeaderCommit(int)
+	LeaderCommit(int) string
 	FollowerCommit(int)
 	String() string
 	Persist()
+	Snapshot()
 }
 
 // State describes the state of the raft algorithm, a server is in
 type state struct {
 	app.StateMachine
+
+	snapshotPath string
 
 	cleanCh chan struct{}
 	durable Durable
@@ -38,7 +49,9 @@ type state struct {
 
 // NewState returns a freshly initialized server state
 func NewState(m app.StateMachine, dirpath string) (State, error) {
-	d, err := NewDurable(dirpath)
+	snapPath := filepath.Join(dirpath, snapshotSubDir)
+	durablePath := filepath.Join(dirpath, stateSubDir)
+	d, err := NewDurable(durablePath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +59,7 @@ func NewState(m app.StateMachine, dirpath string) (State, error) {
 	c := make(chan struct{})
 	go d.Clean(c)
 	return &state{
+		snapshotPath: snapPath,
 		StateMachine: m,
 		cleanCh:      c,
 		durable:      *d,
@@ -54,7 +68,7 @@ func NewState(m app.StateMachine, dirpath string) (State, error) {
 }
 
 func NewTestState(term Term, votedFor *string, log Log, commitIndex int) State {
-	return &state{nil, nil, Durable{}, commitIndex}
+	return &state{nil, "", nil, Durable{}, commitIndex}
 }
 
 // CurrentTerm returns the latest term the server has seen
@@ -118,11 +132,12 @@ func (s *state) setCommitIndex(index int) {
 	s.commitIndex = index
 }
 
-func (s *state) LeaderCommit(majorityMatch int) {
+func (s *state) LeaderCommit(majorityMatch int) string {
 	new := s.highestMajorityMatch(majorityMatch)
 	if new > s.CommitIndex() {
-		s.commit(new)
+		return s.commit(new)
 	}
+	return ""
 }
 
 func (s *state) FollowerCommit(leaderCommit int) {
@@ -130,10 +145,20 @@ func (s *state) FollowerCommit(leaderCommit int) {
 	s.commit(new)
 }
 
-func (s *state) commit(newCommitIndex int) {
+func (s *state) commit(newCommitIndex int) string {
 	toCommit := s.durable.Log.Between(s.commitIndex, newCommitIndex)
-	s.StateMachine.Commit(EntriesToCommands(toCommit))
+	ret := []string{}
+	for _, entry := range toCommit {
+		if !isNoopCmd(entry.Cmd) {
+			ret = append(ret, s.StateMachine.Commit(entry.Cmd))
+		}
+	}
 	s.setCommitIndex(newCommitIndex)
+	return strings.Join(ret, " ")
+}
+
+func isNoopCmd(cmd string) bool {
+	return cmd == ""
 }
 
 func (s *state) leaderCommitOrLogLength(leaderCommit int) int {
@@ -184,16 +209,25 @@ func (s *state) String() string {
 	return fmt.Sprintf("State{%d: %s \t %d: %s}", s.CurrentTerm(), vote, s.CommitIndex(), s.Log().String())
 }
 
-func EntriesToCommands(entries []Entry) []string {
-	cmds := make([]string, len(entries))
-	for i, e := range entries {
-		cmds[i] = e.Cmd
-	}
-	return cmds
-}
-
 func (s *state) Persist() {
 	if err := s.durable.Write(); err != nil {
 		log.Println("Failed to persist state", err)
 	}
+}
+
+func (s *state) Snapshot() {
+	b := s.StateMachine.Snapshot()
+	snap := snapshot{
+		LastIncludedIndex: s.commitIndex,
+		LastIncludedTerm:  s.Log().TermAt(s.commitIndex),
+		ApplicationState:  b,
+	}
+	if err := snap.Write(s.snapshotPath); err != nil {
+		log.Println("Failed to write snapshot", err)
+	}
+	deleteOldSnapshots(s.snapshotPath)
+}
+
+func timeToSnapshot(l Log) bool {
+	return l.Size() > snapshottingSize
 }

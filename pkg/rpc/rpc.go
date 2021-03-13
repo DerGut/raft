@@ -48,6 +48,7 @@ type ClientRequestRequest struct {
 type ClientRequestResponse struct {
 	Success    bool
 	LeaderAddr string
+	Return     string
 }
 
 func registerClusterReceiver(rcvr *ClusterReceiver, address string) error {

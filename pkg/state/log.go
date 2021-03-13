@@ -1,8 +1,10 @@
 package state
 
-import "fmt"
+import (
+	"fmt"
+)
 
-type Term int
+type Term uint32
 
 type Entry struct {
 	Cmd  string
@@ -98,6 +100,10 @@ func (l Log) Since(prevIndex int) []Entry {
 
 func (l Log) Between(prevIndex, until int) []Entry {
 	return l[prevIndex:until]
+}
+
+func (l Log) Size() int {
+	return len(l) * 150
 }
 
 // Equal returns true if x and y equal each other
