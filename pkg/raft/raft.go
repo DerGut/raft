@@ -6,7 +6,6 @@ import (
 
 	"github.com/DerGut/raft/pkg/rpc"
 	"github.com/DerGut/raft/pkg/state"
-	"github.com/DerGut/raft/server"
 	"github.com/DerGut/raft/timer"
 )
 
@@ -25,7 +24,7 @@ const (
 type Raft struct {
 	membership
 	currentLeader *string
-	server.ClusterOptions
+	ClusterOptions
 
 	state.State
 
@@ -58,8 +57,6 @@ func (r *Raft) Run() {
 		case req := <-r.ClientReceiver.ClientRequests:
 			Info.Println("Processing ClientRequest")
 			r.ClientResponses <- r.processClientRequest(ctx, req)
-		case <-time.Tick(10 * time.Second):
-			Info.Printf("Tock: %#v", r.State)
 		}
 		// Leaves the old context in go routines but overwrites the cancelFunc
 		// context.WithCancel(ctx) // cancels old routines too

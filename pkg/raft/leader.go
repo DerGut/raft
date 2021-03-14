@@ -7,10 +7,9 @@ import (
 
 	"github.com/DerGut/raft/pkg/rpc"
 	"github.com/DerGut/raft/pkg/state"
-	"github.com/DerGut/raft/server"
 )
 
-func doHeartbeat(ctx context.Context, s state.State, options server.ClusterOptions) (ok bool) {
+func doHeartbeat(ctx context.Context, s state.State, options ClusterOptions) (ok bool) {
 	ls := s.(state.LeaderState)
 	if ok = updateFollowers(ctx, ls, options); ok {
 		s.LeaderCommit(ls.MajorityMatches())
@@ -34,10 +33,9 @@ type memberResponse struct {
 	*rpc.AppendEntriesResponse
 }
 
-func updateFollowers(ctx context.Context, s state.LeaderState, options server.ClusterOptions) bool {
+func updateFollowers(ctx context.Context, s state.LeaderState, options ClusterOptions) bool {
 	resCh := make(chan memberResponse, len(s.NextIndex))
 
-	log.Println("Updating followers")
 	for _, member := range options.Members {
 		req := buildAppendEntriesRequest(s, options.Address, member)
 		appendEntries(ctx, member, req, resCh)
@@ -49,7 +47,7 @@ func updateFollowers(ctx context.Context, s state.LeaderState, options server.Cl
 // TODO: Debug & Test this
 // Should return after majority has been reached but continue to run in the background until rest of the cluster has agreed.
 // Should be cancellable during all of the operation.
-func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options server.ClusterOptions, resCh chan memberResponse) bool {
+func awaitFollowerResponses(ctx context.Context, s state.LeaderState, options ClusterOptions, resCh chan memberResponse) bool {
 	numAgreed := 1
 	clusterSize := len(options.Members) + 1
 	for !isMajority(numAgreed, clusterSize) {
@@ -95,7 +93,6 @@ func awaitResponse(ctx context.Context, s state.LeaderState, leaderID string, re
 }
 
 func appendEntries(ctx context.Context, member string, req rpc.AppendEntriesRequest, resCh chan memberResponse) {
-	log.Printf("Sending %#v to %s\n", req, member)
 	go func() {
 		res, _ := rpc.AppendEntries(req, member)
 		select {

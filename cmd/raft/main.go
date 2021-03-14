@@ -9,10 +9,8 @@ import (
 	"github.com/DerGut/raft/pkg/raft"
 	"github.com/DerGut/raft/pkg/rpc"
 	"github.com/DerGut/raft/pkg/state"
-	"github.com/DerGut/raft/server"
 )
 
-var debug = flag.Bool("debug", false, "Enable debug mode")
 var address = flag.String("address", "127.0.0.1:3000", "Address and port to listen for connections")
 var statePath = flag.String("state", "/etc/raft", "Directory path where to store persistent state")
 var members app.URIs
@@ -54,7 +52,7 @@ func main() {
 		log.Fatalln("Failed to create state", err)
 	}
 	r := raft.Raft{
-		ClusterOptions:  server.ClusterOptions{Address: *address, Members: members},
+		ClusterOptions:  raft.ClusterOptions{Address: *address, Members: members},
 		State:           s,
 		ClusterReceiver: clusterRcvr,
 		ClientReceiver:  clientRcvr,

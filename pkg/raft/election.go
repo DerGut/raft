@@ -6,10 +6,9 @@ import (
 
 	"github.com/DerGut/raft/pkg/rpc"
 	"github.com/DerGut/raft/pkg/state"
-	"github.com/DerGut/raft/server"
 )
 
-func doRunElection(ctx context.Context, state state.State, options server.ClusterOptions) bool {
+func doRunElection(ctx context.Context, state state.State, options ClusterOptions) bool {
 	initializeNewTerm(state, options.Address)
 
 	req := buildRequestVoteRequest(state, options.Address)
@@ -37,7 +36,7 @@ func buildRequestVoteRequest(state state.State, memberID string) rpc.RequestVote
 	}
 }
 
-func requestVotes(ctx context.Context, state state.State, req rpc.RequestVoteRequest, options server.ClusterOptions) (votes int, ok bool) {
+func requestVotes(ctx context.Context, state state.State, req rpc.RequestVoteRequest, options ClusterOptions) (votes int, ok bool) {
 	clusterSize := len(options.Members)
 	resCh := make(chan *rpc.RequestVoteResponse, clusterSize)
 

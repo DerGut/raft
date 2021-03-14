@@ -24,7 +24,6 @@ type State interface {
 	SetVotedFor(id string)
 	Log() Log
 	DeleteConflictingAndAddNewEntries(prevLogIndex int, entries []Entry)
-	SetLog(l Log)
 	AppendToLog([]string)
 	CommitIndex() int
 	LeaderCommit(int) string
@@ -111,17 +110,13 @@ func (s *state) DeleteConflictingAndAddNewEntries(prevLogIndex int, entries []En
 	s.durable.Log = l
 }
 
-func (s *state) SetLog(l Log) {
-	s.durable.Log = l
-}
-
 func (s *state) AppendToLog(cmds []string) {
 	entries := make([]Entry, len(cmds))
 	for i, cmd := range cmds {
 		entries[i] = Entry{Cmd: cmd, Term: s.CurrentTerm()}
 	}
 	l := s.Log().Append(entries)
-	s.SetLog(l)
+	s.durable.Log = l
 }
 
 func (s *state) CommitIndex() int {
@@ -228,6 +223,8 @@ func (s *state) Snapshot() {
 	deleteOldSnapshots(s.snapshotPath)
 }
 
+// check this in AppendLogEntry or Commit?
+// or check it periodically?
 func timeToSnapshot(l Log) bool {
 	return l.Size() > snapshottingSize
 }

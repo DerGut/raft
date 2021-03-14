@@ -7,14 +7,13 @@ import (
 
 	"github.com/DerGut/raft/pkg/rpc"
 	"github.com/DerGut/raft/pkg/state"
-	"github.com/DerGut/raft/server"
 )
 
 func Test_doRunElection(t *testing.T) {
 	t.Fail()
 	type args struct {
 		state   state.State
-		options server.ClusterOptions
+		options ClusterOptions
 	}
 	tests := []struct {
 		name string
@@ -78,7 +77,7 @@ func Test_requestVotes(t *testing.T) {
 	type args struct {
 		state   state.State
 		req     rpc.RequestVoteRequest
-		options server.ClusterOptions
+		options ClusterOptions
 	}
 	tests := []struct {
 		name      string
